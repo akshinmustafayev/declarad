@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using entraform.AdEntities.User;
 
 namespace entraform.AdEntities.Group
 {
@@ -10,7 +6,7 @@ namespace entraform.AdEntities.Group
     {
         public string Name { get; set; }
         public string Description { get; set; }
-        public List<string> Members { get; set; } = new List<string>();
-        public List<string> MemberOf { get; set; } = new List<string>();
+        public List<AdUser> Members { get; set; } = new List<AdUser>();
+        public List<AdGroup> MemberOf { get; set; } = new List<AdGroup>();
     }
 }

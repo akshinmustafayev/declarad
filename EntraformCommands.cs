@@ -2,11 +2,7 @@
 using entraform.AdEntities;
 using entraform.Services;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace entraform
 {
@@ -43,6 +39,21 @@ namespace entraform
 
             // Try parse HCL plan
             AdPlan adPlan = _entraFormHclPlanService.GetHclPlan(hclPlan.ToString());
+            Console.WriteLine(adPlan.Users[0].Name);
+            Console.WriteLine(adPlan.Users[0].Surname);
+            Console.WriteLine(adPlan.Users[0].DisplayName);
+            Console.WriteLine(adPlan.Users[0].SamAccountName);
+            Console.WriteLine(adPlan.Users[0].Email);
+            Console.WriteLine(adPlan.Users[0].Ou);
+            Console.WriteLine(adPlan.Users[0].Groups[0].Name);
+            Console.WriteLine(adPlan.Users[0].Groups[1].Name);
+            Console.WriteLine(Environment.NewLine);
+            Console.WriteLine(Environment.NewLine);
+            Console.WriteLine(adPlan.Groups[0].Name);
+            Console.WriteLine(adPlan.Groups[0].Members[0].SamAccountName);
+            Console.WriteLine(adPlan.Groups[0].Members[1].SamAccountName);
+            Console.WriteLine(Environment.NewLine);
+            Console.WriteLine(Environment.NewLine);
 
             _logger.LogDebug("Parsed HCL:\n{HCL}", hclPlan.ToString());
         }

@@ -1,15 +1,10 @@
 ﻿using entraform.AdEntities;
+using entraform.AdEntities.Group;
 using entraform.AdEntities.User;
 using Microsoft.Extensions.Logging;
 using Octopus.CoreParsers.Hcl;
 using Sprache;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Linq;
 
 namespace entraform.Services
 {
@@ -81,7 +76,12 @@ namespace entraform.Services
                         {
                             case "user":
                                 {
-                                    adPlan.Users.Add(MapAdUser(hclElement));
+                                    adPlan.Users?.Add(MapAdUser(hclElement));
+                                }
+                                break;
+                            case "group":
+                                {
+                                    adPlan.Groups?.Add(MapAdGroup(hclElement));
                                 }
                                 break;
                         }
@@ -113,6 +113,9 @@ namespace entraform.Services
                         case "surname":
                             adUser.Surname = property.Value;
                             break;
+                        case "displayname":
+                            adUser.DisplayName = property.Value;
+                            break;
                         case "samaccountname":
                             adUser.SamAccountName = property.Value;
                             break;
@@ -133,7 +136,13 @@ namespace entraform.Services
                                     {
                                         if (!string.IsNullOrEmpty(group.Value))
                                         {
-                                            adUser.Groups.Add(group.Value);
+                                            if (adUser.Groups?.Count > 0 && adUser.Groups.Where(x => x.Name == group.Value).Any())
+                                            {
+                                                _logger.LogError("Duplicate user group {Group} for user with SamAccountName {User} already specified. Please remove duplicate data.", group.Value, hclElement.Value);
+                                                Environment.Exit(1);
+                                            }
+
+                                            adUser.Groups?.Add(new AdGroup { Name = group.Value });
                                         }
                                     }
                                 }
@@ -161,13 +170,85 @@ namespace entraform.Services
                 Environment.Exit(1);
             }
 
-            if (adPlan.Users.Where(x => x.SamAccountName == adUser.SamAccountName).Any())
+            if (adUser.DisplayName == null)
             {
-                _logger.LogError("Deublicate user with SamAccountName {User} already specified. Please remove dublicate data.", hclElement.Value);
+                adUser.DisplayName = $"{adUser.Name} {adUser.Surname}";
+            }
+
+            if (adPlan.Users?.Count > 0 && adPlan.Users.Where(x => x.SamAccountName == adUser.SamAccountName).Any())
+            {
+                _logger.LogError("Duplicate user with SamAccountName {User} already specified. Please remove Duplicate data.", hclElement.Value);
                 Environment.Exit(1);
             }
 
             return adUser;
+        }
+
+        private AdGroup MapAdGroup(HclElement hclElement)
+        {
+            AdGroup adGroup = new AdGroup();
+            adGroup.Name = hclElement.Value;
+
+            if (hclElement.Children != null && hclElement.Children.Count() > 0)
+            {
+                foreach (HclElement property in hclElement.Children)
+                {
+                    switch (property.Name.ToLower())
+                    {
+                        case "description":
+                            adGroup.Description = property.Value;
+                            break;
+                        case "members":
+                            {
+                                if (property.Children != null && property.Children.Count() > 0)
+                                {
+                                    foreach (HclElement user in property.Children)
+                                    {
+                                        if (!string.IsNullOrEmpty(user.Value))
+                                        {
+                                            if (adGroup.Members?.Count > 0 && adGroup.Members.Where(x => x.SamAccountName == user.Value).Any())
+                                            {
+                                                _logger.LogError("Duplicate user {User} for group with name {Group} already specified. Please remove duplicate data.", user.Value, hclElement.Value);
+                                                Environment.Exit(1);
+                                            }
+
+                                            adGroup.Members?.Add(new AdUser { SamAccountName = user.Value });
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        case "memberof":
+                            {
+                                if (property.Children != null && property.Children.Count() > 0)
+                                {
+                                    foreach (HclElement group in property.Children)
+                                    {
+                                        if (!string.IsNullOrEmpty(group.Value))
+                                        {
+                                            if (adGroup.MemberOf?.Count > 0 && adGroup.MemberOf.Where(x => x.Name == group.Value).Any())
+                                            {
+                                                _logger.LogError("Duplicate group {Group} for group with name {Group} already specified. Please remove duplicate data.", group.Value, hclElement.Value);
+                                                Environment.Exit(1);
+                                            }
+
+                                            adGroup.MemberOf?.Add(new AdGroup { Name = group.Value });
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+
+            if (adGroup.Name == null)
+            {
+                _logger.LogError("Name for group {Group} is required but not provided in the file.", hclElement.Value);
+                Environment.Exit(1);
+            }
+
+            return adGroup;
         }
     }
 }
