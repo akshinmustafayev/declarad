@@ -1,14 +1,10 @@
-﻿using entraform.AdEntities.Group;
-using entraform.AdEntities.OrganizationalUnit;
-using entraform.AdEntities.User;
-
-namespace entraform.AdEntities
+﻿namespace entraform.AdEntities
 {
     public class AdPlan
     {
         public AdConnection Connection { get; set; }
-        public List<AdUser>? Users { get; set; } = new List<AdUser>();
-        public List<AdGroup>? Groups { get; set; } = new List<AdGroup>();
-        public List<AdOrganizationalUnit>? OrganizationalUnits { get; set; } = new List<AdOrganizationalUnit>();
+        public List<AdActionStep> ActionSteps { get; set; } = new();
+        public List<AdResource> Resources { get; set; } = new();
+        public List<AdVariable> Variables { get; set; } = new();
     }
 }

@@ -1,5 +1,6 @@
 ﻿using entraform.AdEntities;
 using entraform.AdEntities.Group;
+using entraform.AdEntities.OrganizationalUnit;
 using entraform.AdEntities.User;
 using Microsoft.Extensions.Logging;
 using Octopus.CoreParsers.Hcl;
@@ -67,8 +68,7 @@ namespace entraform.Services
             try 
             { 
                 HclElement parsedHcl = HclParser.HclTemplate.Parse(hclPlan);
-
-                if(parsedHcl.Children != null && parsedHcl.Children.Count() > 0)
+                if (parsedHcl.Children != null && parsedHcl.Children.Count() > 0)
                 {
                     foreach (HclElement hclElement in parsedHcl.Children)
                     {
@@ -76,12 +76,32 @@ namespace entraform.Services
                         {
                             case "user":
                                 {
-                                    adPlan.Users?.Add(MapAdUser(hclElement));
+                                    MapAdUser(hclElement);
                                 }
                                 break;
                             case "group":
                                 {
-                                    adPlan.Groups?.Add(MapAdGroup(hclElement));
+                                    MapAdGroup(hclElement);
+                                }
+                                break;
+                            case "ou":
+                                {
+                                    MapAdOrganizationalUnit(hclElement);
+                                }
+                                break;
+                            case "gpo":
+                                {
+                                    
+                                }
+                                break;
+                            case "resource":
+                                {
+                                    
+                                }
+                                break;
+                            case "variable":
+                                {
+
                                 }
                                 break;
                         }
@@ -97,7 +117,7 @@ namespace entraform.Services
             return adPlan;
         }
 
-        private AdUser MapAdUser(HclElement hclElement)
+        private void MapAdUser(HclElement hclElement)
         {
             AdUser adUser = new AdUser();
 
@@ -175,16 +195,26 @@ namespace entraform.Services
                 adUser.DisplayName = $"{adUser.Name} {adUser.Surname}";
             }
 
-            if (adPlan.Users?.Count > 0 && adPlan.Users.Where(x => x.SamAccountName == adUser.SamAccountName).Any())
+            var existingUsers = new HashSet<string>(adPlan.ActionSteps.Where(x => x.AdItem is AdUser user).Select(x => ((AdUser)x.AdItem!).SamAccountName), StringComparer.OrdinalIgnoreCase);
+            if (existingUsers.Contains(adUser.SamAccountName))
             {
-                _logger.LogError("Duplicate user with SamAccountName {User} already specified. Please remove Duplicate data.", hclElement.Value);
+                _logger.LogError("Duplicate user with SamAccountName {User} already specified. Please remove duplicate data.", hclElement.Value);
                 Environment.Exit(1);
             }
 
-            return adUser;
+            adPlan.ActionSteps.Add(
+                new AdActionStep
+                {
+                    Id = Guid.NewGuid(),
+                    Ordering = adPlan.ActionSteps.Count + 1,
+                    AdItem = adUser,
+                    Type = AdItemType.User,
+                    Operation = AdItemOperation.None
+                }
+            );
         }
 
-        private AdGroup MapAdGroup(HclElement hclElement)
+        private void MapAdGroup(HclElement hclElement)
         {
             AdGroup adGroup = new AdGroup();
             adGroup.Name = hclElement.Value;
@@ -242,13 +272,60 @@ namespace entraform.Services
                 }
             }
 
-            if (adGroup.Name == null)
+            var existingGroups = new HashSet<string>(adPlan.ActionSteps.Where(x => x.AdItem is AdGroup group).Select(x => ((AdGroup)x.AdItem!).Name), StringComparer.OrdinalIgnoreCase);
+            if (existingGroups.Contains(adGroup.Name))
             {
-                _logger.LogError("Name for group {Group} is required but not provided in the file.", hclElement.Value);
+                _logger.LogError("Duplicate group with name {Group} already specified. Please remove duplicate data.", hclElement.Value);
                 Environment.Exit(1);
             }
 
-            return adGroup;
+            adPlan.ActionSteps.Add(
+                new AdActionStep
+                {
+                    Id = Guid.NewGuid(),
+                    Ordering = adPlan.ActionSteps.Count + 1,
+                    AdItem = adGroup,
+                    Type = AdItemType.Group,
+                    Operation = AdItemOperation.None
+                }
+            );
+        }
+
+        private void MapAdOrganizationalUnit(HclElement hclElement)
+        {
+            AdOrganizationalUnit adOrganizationalUnit = new AdOrganizationalUnit();
+            adOrganizationalUnit.Name = hclElement.Value;
+
+            if (hclElement.Children != null && hclElement.Children.Count() > 0)
+            {
+                foreach (HclElement property in hclElement.Children)
+                {
+                    switch (property.Name.ToLower())
+                    {
+                        case "distinguishedname":
+                            adOrganizationalUnit.DistinguishedName = property.Value;
+                            break;
+                    }
+                }
+            }
+
+            var existingOrganizationalUnits = new HashSet<string>(adPlan.ActionSteps.Where(x => x.AdItem is AdOrganizationalUnit organizationalUnit).Select(x => ((AdOrganizationalUnit)x.AdItem!).Name), StringComparer.OrdinalIgnoreCase);
+            if (existingOrganizationalUnits.Contains(adOrganizationalUnit.Name))
+            {
+                _logger.LogError("Duplicate organizational unit with name {Name} already specified. Please remove duplicate data.", hclElement.Value);
+                Environment.Exit(1);
+            }
+
+            adPlan.ActionSteps.Add(
+                new AdActionStep
+                {
+                    Id = Guid.NewGuid(),
+                    Ordering = adPlan.ActionSteps.Count + 1,
+                    AdItem = adOrganizationalUnit,
+                    Type = AdItemType.OrganizationalUnit,
+                    Operation = AdItemOperation.None
+                }
+            );
         }
     }
 }

@@ -2,7 +2,7 @@
 
 namespace entraform.AdEntities.Group
 {
-    public class AdGroup
+    public class AdGroup : IAdItem
     {
         public string Name { get; set; }
         public string Description { get; set; }

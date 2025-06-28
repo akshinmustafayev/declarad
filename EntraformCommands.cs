@@ -2,6 +2,7 @@
 using entraform.AdEntities;
 using entraform.Services;
 using Microsoft.Extensions.Logging;
+using Naos.Recipes.WinRM;
 using System.Text;
 
 namespace entraform
@@ -29,7 +30,14 @@ namespace entraform
         )
         {
             // Show message
-            _logger.LogInformation("Planning execution for file: {Files}", Files);
+            if (Files == null)
+            {
+                _logger.LogInformation("Planning execution for all .ef files in a directory");
+            }
+            else
+            {
+                _logger.LogInformation("Planning execution for files: {Files}", string.Join(", ", Files));
+            }
 
             // Init variables
             StringBuilder hclPlan = new StringBuilder("");
@@ -39,21 +47,19 @@ namespace entraform
 
             // Try parse HCL plan
             AdPlan adPlan = _entraFormHclPlanService.GetHclPlan(hclPlan.ToString());
-            Console.WriteLine(adPlan.Users[0].Name);
-            Console.WriteLine(adPlan.Users[0].Surname);
-            Console.WriteLine(adPlan.Users[0].DisplayName);
-            Console.WriteLine(adPlan.Users[0].SamAccountName);
-            Console.WriteLine(adPlan.Users[0].Email);
-            Console.WriteLine(adPlan.Users[0].Ou);
-            Console.WriteLine(adPlan.Users[0].Groups[0].Name);
-            Console.WriteLine(adPlan.Users[0].Groups[1].Name);
-            Console.WriteLine(Environment.NewLine);
-            Console.WriteLine(Environment.NewLine);
-            Console.WriteLine(adPlan.Groups[0].Name);
-            Console.WriteLine(adPlan.Groups[0].Members[0].SamAccountName);
-            Console.WriteLine(adPlan.Groups[0].Members[1].SamAccountName);
-            Console.WriteLine(Environment.NewLine);
-            Console.WriteLine(Environment.NewLine);
+
+            // Test
+            var machineManager = new MachineManager(
+                "192.168.231.142",
+                "Administrator2",
+                "A123456a".ToSecureString(),
+                autoManageTrustedHosts: true);
+            var fileObjectsWithTwoTypedParameters = machineManager.RunScript("{ get-content c:\\windows\\system32\\drivers\\etc\\hosts }");
+            
+            foreach(var line in fileObjectsWithTwoTypedParameters)
+            {
+                Console.WriteLine("Result content: " + line.ToString());
+            }
 
             _logger.LogDebug("Parsed HCL:\n{HCL}", hclPlan.ToString());
         }

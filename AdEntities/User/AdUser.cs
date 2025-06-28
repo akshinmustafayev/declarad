@@ -2,7 +2,7 @@
 
 namespace entraform.AdEntities.User
 {
-    public class AdUser
+    public class AdUser : IAdItem
     {
         public string Name { get; set; }
         public string Surname { get; set; }
