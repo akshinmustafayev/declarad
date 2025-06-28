@@ -7,4 +7,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Cocona" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.6" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.6" />
+    <PackageReference Include="Octopus.CoreParsers.Hcl" Version="1.1.599" />
+    <PackageReference Include="Sprache" Version="2.3.1" />
+    <PackageReference Include="System.Management.Automation" Version="7.5.2" />
+  </ItemGroup>
+
 </Project>
