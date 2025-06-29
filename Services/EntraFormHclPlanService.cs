@@ -2,6 +2,7 @@
 using entraform.AdEntities.Group;
 using entraform.AdEntities.OrganizationalUnit;
 using entraform.AdEntities.User;
+using entraform.Utils;
 using Microsoft.Extensions.Logging;
 using Octopus.CoreParsers.Hcl;
 using Sprache;
@@ -13,6 +14,7 @@ namespace entraform.Services
     {
         StringBuilder GetHclPlanFromFiles(IEnumerable<string> Files);
         AdPlan GetHclPlan(string hclPlan);
+        void CheckServerConnection();
     }
 
     public class EntraFormHclPlanService : IEntraFormHclPlanService
@@ -42,6 +44,11 @@ namespace entraform.Services
                         hclPlan.Append(Environment.NewLine);
                         hclPlan.Append(Environment.NewLine);
                     }
+                }
+                else
+                {
+                    _logger.LogError("No .ef files found in the current directory or subdirectories.");
+                    Environment.Exit(1);
                 }
             }
             else
@@ -74,6 +81,12 @@ namespace entraform.Services
                     {
                         switch(hclElement.Name.ToLower())
                         {
+
+                            case "configuration":
+                                {
+                                    MapConfiguration(hclElement);
+                                }
+                                break;
                             case "user":
                                 {
                                     MapAdUser(hclElement);
@@ -115,6 +128,33 @@ namespace entraform.Services
             }
 
             return adPlan;
+        }
+
+        private void MapConfiguration(HclElement hclElement)
+        {
+            AdConnection adConnection = new AdConnection();
+            adConnection.Name = hclElement.Value;
+
+            if (hclElement.Children != null && hclElement.Children.Count() > 0)
+            {
+                foreach (HclElement property in hclElement.Children)
+                {
+                    switch (property.Name.ToLower())
+                    {
+                        case "server":
+                            adConnection.Server = property.Value;
+                            break;
+                        case "user":
+                            adConnection.User = property.Value;
+                            break;
+                        case "password":
+                            adConnection.Password = property.Value;
+                            break;
+                    }
+                }
+            }
+
+            adPlan.Connection = adConnection;
         }
 
         private void MapAdUser(HclElement hclElement)
@@ -326,6 +366,22 @@ namespace entraform.Services
                     Operation = AdItemOperation.None
                 }
             );
+        }
+
+        public void CheckServerConnection()
+        {
+            if(adPlan.Connection.Server == null || adPlan.Connection.User == null || adPlan.Connection.Password == null)
+            {
+                _logger.LogError("AD connection details are not provided. Please provide server, user, and password details.");
+                Environment.Exit(1);
+            }
+            
+            bool isConnected = TcpConnectionChecker.CheckTcpConnection(adPlan.Connection.Server, 5985, 5000);
+            if(isConnected == false)
+            {
+                _logger.LogError("Failed to connect to the server {Server} on port 5985. Please check your connection details for {Name} connection.", adPlan.Connection.Server, adPlan.Connection.Name);
+                Environment.Exit(1);
+            }
         }
     }
 }

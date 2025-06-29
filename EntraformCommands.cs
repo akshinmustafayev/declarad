@@ -48,7 +48,11 @@ namespace entraform
             // Try parse HCL plan
             AdPlan adPlan = _entraFormHclPlanService.GetHclPlan(hclPlan.ToString());
 
+            // Test server connection
+            _entraFormHclPlanService.CheckServerConnection();
+
             // Test
+            /*
             var machineManager = new MachineManager(
                 "192.168.231.142",
                 "Administrator2",
@@ -60,6 +64,7 @@ namespace entraform
             {
                 Console.WriteLine("Result content: " + line.ToString());
             }
+            */
 
             _logger.LogDebug("Parsed HCL:\n{HCL}", hclPlan.ToString());
         }
