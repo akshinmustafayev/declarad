@@ -2,7 +2,6 @@
 using entraform.AdEntities.Group;
 using entraform.AdEntities.OrganizationalUnit;
 using entraform.AdEntities.User;
-using entraform.Utils;
 using Microsoft.Extensions.Logging;
 using Octopus.CoreParsers.Hcl;
 using Sprache;
@@ -14,7 +13,6 @@ namespace entraform.Services
     {
         StringBuilder GetHclPlanFromFiles(IEnumerable<string> Files);
         AdPlan GetHclPlan(string hclPlan);
-        void CheckServerConnection();
     }
 
     public class EntraFormHclPlanService : IEntraFormHclPlanService
@@ -72,16 +70,15 @@ namespace entraform.Services
 
         public AdPlan GetHclPlan(string hclPlan)
         {
-            try 
-            { 
+            try
+            {
                 HclElement parsedHcl = HclParser.HclTemplate.Parse(hclPlan);
                 if (parsedHcl.Children != null && parsedHcl.Children.Count() > 0)
                 {
                     foreach (HclElement hclElement in parsedHcl.Children)
                     {
-                        switch(hclElement.Name.ToLower())
+                        switch (hclElement.Name.ToLower())
                         {
-
                             case "configuration":
                                 {
                                     MapConfiguration(hclElement);
@@ -100,16 +97,17 @@ namespace entraform.Services
                             case "ou":
                                 {
                                     MapAdOrganizationalUnit(hclElement);
+                                    SortAdOrganizationalUnits();
                                 }
                                 break;
                             case "gpo":
                                 {
-                                    
+
                                 }
                                 break;
                             case "resource":
                                 {
-                                    
+
                                 }
                                 break;
                             case "variable":
@@ -161,9 +159,9 @@ namespace entraform.Services
         {
             AdUser adUser = new AdUser();
 
-            if(hclElement.Children != null && hclElement.Children.Count() > 0)
+            if (hclElement.Children != null && hclElement.Children.Count() > 0)
             {
-                foreach(HclElement property in hclElement.Children)
+                foreach (HclElement property in hclElement.Children)
                 {
                     switch (property.Name.ToLower())
                     {
@@ -173,11 +171,17 @@ namespace entraform.Services
                         case "surname":
                             adUser.Surname = property.Value;
                             break;
+                        case "password":
+                            adUser.Password = property.Value;
+                            break;
                         case "displayname":
                             adUser.DisplayName = property.Value;
                             break;
                         case "samaccountname":
                             adUser.SamAccountName = property.Value;
+                            break;
+                        case "userprincipalname":
+                            adUser.UserPrincipalName = property.Value;
                             break;
                         case "email":
                             adUser.Email = property.Value;
@@ -186,7 +190,10 @@ namespace entraform.Services
                             adUser.Ou = property.Value;
                             break;
                         case "enabled":
-                            adUser.Enabled = bool.TryParse(property.Value, out var result) && result;
+                            adUser.Enabled = bool.TryParse(property.Value, out var enabledResult) && enabledResult;
+                            break;
+                        case "changepasswordatlogon":
+                            adUser.ChangePasswordAtLogon = bool.TryParse(property.Value, out var changePasswordAtLogonResult) && changePasswordAtLogonResult;
                             break;
                         case "groups":
                             {
@@ -212,7 +219,7 @@ namespace entraform.Services
                 }
             }
 
-            if(adUser.Name == null)
+            if (adUser.Name == null)
             {
                 _logger.LogError("Name for user {User} is required but not provided in the file.", hclElement.Value);
                 Environment.Exit(1);
@@ -342,8 +349,32 @@ namespace entraform.Services
                 {
                     switch (property.Name.ToLower())
                     {
-                        case "distinguishedname":
-                            adOrganizationalUnit.DistinguishedName = property.Value;
+                        case "path":
+                            adOrganizationalUnit.Path = property.Value;
+                            break;
+                        case "protectedfromaccidentaldeletion":
+                            adOrganizationalUnit.ProtectedFromAccidentalDeletion = bool.TryParse(property.Value, out var adOrganizationalUnitResult) && adOrganizationalUnitResult;
+                            break;
+                        case "city":
+                            adOrganizationalUnit.City = property.Value;
+                            break;
+                        case "country":
+                            adOrganizationalUnit.Country = property.Value;
+                            break;
+                        case "description":
+                            adOrganizationalUnit.Description = property.Value;
+                            break;
+                        case "displayname":
+                            adOrganizationalUnit.DisplayName = property.Value;
+                            break;
+                        case "postalcode":
+                            adOrganizationalUnit.PostalCode = property.Value;
+                            break;
+                        case "state":
+                            adOrganizationalUnit.State = property.Value;
+                            break;
+                        case "streetaddress":
+                            adOrganizationalUnit.StreetAddress = property.Value;
                             break;
                     }
                 }
@@ -367,20 +398,27 @@ namespace entraform.Services
                 }
             );
         }
-
-        public void CheckServerConnection()
+        private void SortAdOrganizationalUnits()
         {
-            if(adPlan.Connection.Server == null || adPlan.Connection.User == null || adPlan.Connection.Password == null)
+            var ouStepsWithIndex = adPlan.ActionSteps
+                .Select((step, index) => new { step, index })
+                .Where(x => x.step.AdItem is AdOrganizationalUnit)
+                .ToList();
+
+            // Step 2: Sort the OU steps by Path.Length
+            var sortedOuSteps = ouStepsWithIndex
+                .Select(x => x.step)
+                .OrderBy(x => ((AdOrganizationalUnit)x.AdItem).Path.Split(",").Length)
+                .ThenBy(x => ((AdOrganizationalUnit)x.AdItem).Path)
+                .ToList();
+
+            // Step 3: Replace original OU steps in-place with sorted ones
+            for (int i = 0; i < ouStepsWithIndex.Count; i++)
             {
-                _logger.LogError("AD connection details are not provided. Please provide server, user, and password details.");
-                Environment.Exit(1);
-            }
-            
-            bool isConnected = TcpConnectionChecker.CheckTcpConnection(adPlan.Connection.Server, 5985, 5000);
-            if(isConnected == false)
-            {
-                _logger.LogError("Failed to connect to the server {Server} on port 5985. Please check your connection details for {Name} connection.", adPlan.Connection.Server, adPlan.Connection.Name);
-                Environment.Exit(1);
+                int indexToReplace = ouStepsWithIndex[i].index;
+                var sortedStep = sortedOuSteps[i];
+                sortedStep.Ordering = indexToReplace; // Set ordering to match its position in the ActionSteps list
+                adPlan.ActionSteps[indexToReplace] = sortedStep;
             }
         }
     }

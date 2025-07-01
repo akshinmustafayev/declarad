@@ -1,9 +1,11 @@
 ﻿using Cocona;
 using entraform.AdEntities;
+using entraform.AdEntities.User;
 using entraform.Services;
 using Microsoft.Extensions.Logging;
 using Naos.Recipes.WinRM;
 using System.Text;
+using System.Text.Json;
 
 namespace entraform
 {
@@ -12,15 +14,18 @@ namespace entraform
         private readonly ILogger<EntraformCommands> _logger;
         private readonly IUserService _userService;
         private readonly IEntraFormHclPlanService _entraFormHclPlanService;
+        private readonly IEntraFormConnectionService _entraFormConnectionService;
 
         public EntraformCommands(
             ILogger<EntraformCommands> logger,
             IUserService userService,
-            IEntraFormHclPlanService entraFormHclPlanService)
+            IEntraFormHclPlanService entraFormHclPlanService,
+            IEntraFormConnectionService entraFormConnectionService)
         {
             _logger = logger;
             _userService = userService;
             _entraFormHclPlanService = entraFormHclPlanService;
+            _entraFormConnectionService = entraFormConnectionService;
         }
 
         [Command("plan")]
@@ -47,19 +52,15 @@ namespace entraform
 
             // Try parse HCL plan
             AdPlan adPlan = _entraFormHclPlanService.GetHclPlan(hclPlan.ToString());
+            _entraFormConnectionService.SetAdPlan(adPlan);
+            _entraFormConnectionService.InitMachineManager();
 
             // Test server connection
-            _entraFormHclPlanService.CheckServerConnection();
+            _entraFormConnectionService.CheckServerConnection();
 
             // Test
             /*
-            var machineManager = new MachineManager(
-                "192.168.231.142",
-                "Administrator2",
-                "A123456a".ToSecureString(),
-                autoManageTrustedHosts: true);
-            var fileObjectsWithTwoTypedParameters = machineManager.RunScript("{ get-content c:\\windows\\system32\\drivers\\etc\\hosts }");
-            
+            var fileObjectsWithTwoTypedParameters = machineManager.RunScript("{ get-content c:\\windows\\system32\\drivers\\etc\\hosts }", null);
             foreach(var line in fileObjectsWithTwoTypedParameters)
             {
                 Console.WriteLine("Result content: " + line.ToString());

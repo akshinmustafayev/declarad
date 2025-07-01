@@ -14,6 +14,7 @@ namespace entraform
             bool isDebug = File.Exists("debug");
             builder.Services.AddSingleton<IUserService, UserService>();
             builder.Services.AddSingleton<IEntraFormHclPlanService, EntraFormHclPlanService>();
+            builder.Services.AddSingleton<IEntraFormConnectionService, EntraFormConnectionService>();
             builder.Services.AddLogging(logging =>
             {
                 logging.AddConsole();

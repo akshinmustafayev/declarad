@@ -259,7 +259,7 @@ namespace Naos.Recipes.WinRM
 #else
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [System.CodeDom.Compiler.GeneratedCode("Naos.Recipes.WinRM", "See package version number")]
-    internal
+    public
 #endif
     class MachineManager : IManageMachines
     {
