@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace entraform.Services
+namespace declarad.Services
 {
     public interface IUserService
     {

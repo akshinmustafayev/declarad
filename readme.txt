@@ -6,6 +6,8 @@ https://registry.terraform.io/providers/hashicorp/ad/latest/docs/resources/user
 https://learn.microsoft.com/en-us/powershell/module/activedirectory/new-aduser?view=windowsserver2016-ps
 https://medium.com/@eduardosilva_94960/mastering-command-line-parsing-in-net-core-with-commandlineparser-c20721100359
 
+https://stackoverflow.com/questions/77109472/c-sharp-how-to-connect-to-ldap-ad-dc-server-using-ssl-or-tls-from-linux-ubuntu
+https://gist.github.com/trepidity/5821244c6a8a2c4d97a6a0d94b5269dd
 
 // can transfer files to AND from the remote server (over WinRM's protocol!).
 var localFilePath = @"D:\Temp\BigFileLocal.nupkg";

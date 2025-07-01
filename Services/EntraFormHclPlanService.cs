@@ -1,13 +1,13 @@
-﻿using entraform.AdEntities;
-using entraform.AdEntities.Group;
-using entraform.AdEntities.OrganizationalUnit;
-using entraform.AdEntities.User;
+﻿using declarad.AdEntities;
+using declarad.AdEntities.Group;
+using declarad.AdEntities.OrganizationalUnit;
+using declarad.AdEntities.User;
 using Microsoft.Extensions.Logging;
 using Octopus.CoreParsers.Hcl;
 using Sprache;
 using System.Text;
 
-namespace entraform.Services
+namespace declarad.Services
 {
     public interface IEntraFormHclPlanService
     {
@@ -148,8 +148,20 @@ namespace entraform.Services
                         case "password":
                             adConnection.Password = property.Value;
                             break;
+                        case "domain":
+                            adConnection.Domain = property.Value;
+                            break;
+                        case "protocol":
+                            adConnection.Protocol = property.Value;
+                            break;
                     }
                 }
+            }
+
+            if(!adConnection.Protocol.Equals("LDAP", StringComparison.OrdinalIgnoreCase) || !adConnection.Protocol.Equals("LDAPS", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogError("Invalid protocol {Protocol} specified for connection {Name}. Only LDAP and LDAPS are supported.", adConnection.Protocol, adConnection.Name);
+                Environment.Exit(1);
             }
 
             adPlan.Connection = adConnection;
@@ -398,6 +410,7 @@ namespace entraform.Services
                 }
             );
         }
+
         private void SortAdOrganizationalUnits()
         {
             var ouStepsWithIndex = adPlan.ActionSteps

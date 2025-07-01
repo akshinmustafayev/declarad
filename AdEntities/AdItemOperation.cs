@@ -1,4 +1,4 @@
-﻿namespace entraform.AdEntities
+﻿namespace declarad.AdEntities
 {
     public enum AdItemOperation
     {

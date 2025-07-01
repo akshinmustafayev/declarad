@@ -1,6 +1,6 @@
-﻿using entraform.AdEntities.User;
+﻿using declarad.AdEntities.User;
 
-namespace entraform.AdEntities.Group
+namespace declarad.AdEntities.Group
 {
     public class AdGroup : IAdItem
     {

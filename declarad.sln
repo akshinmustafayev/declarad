@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36203.30 d17.14
+VisualStudioVersion = 17.14.36203.30
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "entraform", "entraform.csproj", "{35EE2C5C-6716-4B79-B24E-FF61F53EF8A5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "declarad", "declarad.csproj", "{35EE2C5C-6716-4B79-B24E-FF61F53EF8A5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

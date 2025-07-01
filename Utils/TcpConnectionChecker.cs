@@ -1,6 +1,6 @@
 ﻿using System.Net.Sockets;
 
-namespace entraform.Utils
+namespace declarad.Utils
 {
     public static class TcpConnectionChecker
     {

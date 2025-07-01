@@ -1,15 +1,12 @@
-﻿using entraform.AdEntities;
-using entraform.Utils;
+﻿using declarad.AdEntities;
+using declarad.Utils;
 using Microsoft.Extensions.Logging;
-using Naos.Recipes.WinRM;
 
-namespace entraform.Services
+namespace declarad.Services
 {
     public interface IEntraFormConnectionService
     {
         void SetAdPlan(AdPlan adPlan);
-        void InitMachineManager();
-        MachineManager GetMachineManager();
         void CheckServerConnection();
     }
 
@@ -18,7 +15,7 @@ namespace entraform.Services
     {
         private readonly ILogger<EntraFormConnectionService> _logger;
         private AdPlan _adPlan = new AdPlan();
-        MachineManager _machineManager;
+        private AdManager _adManager;
 
         public EntraFormConnectionService(ILogger<EntraFormConnectionService> logger)
         {
@@ -29,23 +26,11 @@ namespace entraform.Services
         {
             _adPlan = adPlan;
             _logger.LogDebug("AD Plan set with connection details: {Server}, {User}", adPlan.Connection.Server, adPlan.Connection.User);
+            _adManager = new AdManager(_adPlan.Connection);
+            _logger.LogDebug("AdManager was set within specified connection");
         }
 
-        public void InitMachineManager()
-        {
-            _machineManager = new MachineManager(
-                _adPlan.Connection.Server,
-                _adPlan.Connection.User,
-                _adPlan.Connection.Password.ToSecureString(),
-                autoManageTrustedHosts: true);
-            _logger.LogDebug("Connection manager initialized");
-        }
-
-        public MachineManager GetMachineManager()
-        {
-            return _machineManager;
-        }
-
+        
         public void CheckServerConnection()
         {
             if (_adPlan.Connection.Server == null || _adPlan.Connection.User == null || _adPlan.Connection.Password == null)

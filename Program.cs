@@ -1,9 +1,9 @@
 ﻿using Cocona;
-using entraform.Services;
+using declarad.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace entraform
+namespace declarad
 {
     public class Program
     {

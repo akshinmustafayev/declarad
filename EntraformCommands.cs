@@ -1,13 +1,10 @@
 ﻿using Cocona;
-using entraform.AdEntities;
-using entraform.AdEntities.User;
-using entraform.Services;
+using declarad.AdEntities;
+using declarad.Services;
 using Microsoft.Extensions.Logging;
-using Naos.Recipes.WinRM;
 using System.Text;
-using System.Text.Json;
 
-namespace entraform
+namespace declarad
 {
     public class EntraformCommands
     {
@@ -53,7 +50,6 @@ namespace entraform
             // Try parse HCL plan
             AdPlan adPlan = _entraFormHclPlanService.GetHclPlan(hclPlan.ToString());
             _entraFormConnectionService.SetAdPlan(adPlan);
-            _entraFormConnectionService.InitMachineManager();
 
             // Test server connection
             _entraFormConnectionService.CheckServerConnection();

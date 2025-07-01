@@ -1,4 +1,4 @@
-﻿namespace entraform.AdEntities.OrganizationalUnit
+﻿namespace declarad.AdEntities.OrganizationalUnit
 {
     public class AdOrganizationalUnit : IAdItem
     {
