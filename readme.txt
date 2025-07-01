@@ -8,6 +8,8 @@ https://medium.com/@eduardosilva_94960/mastering-command-line-parsing-in-net-cor
 
 https://stackoverflow.com/questions/77109472/c-sharp-how-to-connect-to-ldap-ad-dc-server-using-ssl-or-tls-from-linux-ubuntu
 https://gist.github.com/trepidity/5821244c6a8a2c4d97a6a0d94b5269dd
+https://github.com/auth0-blog/blog-ldap-csharp-example/blob/master/LDAPClient/LDAPClient/Client.cs
+
 
 // can transfer files to AND from the remote server (over WinRM's protocol!).
 var localFilePath = @"D:\Temp\BigFileLocal.nupkg";
