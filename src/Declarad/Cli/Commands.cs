@@ -736,7 +736,7 @@ namespace Declarad.Cli
         {
             if (g.NoColor)
             {
-                _ui.Color = false;
+                _ui.DisableColor();
             }
             try
             {

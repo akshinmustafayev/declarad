@@ -20,10 +20,18 @@ namespace Declarad
 
             // Logging must be configured before the host is built, so the flag is read up front.
             bool verbose = args.Contains("-v") || args.Contains("--verbose");
+            bool noColor = args.Contains("--no-color") || Environment.GetEnvironmentVariable("NO_COLOR") != null;
 
             var builder = CoconaApp.CreateBuilder(args, options => options.TreatPublicMethodsAsCommands = false);
             builder.Logging.ClearProviders();
-            builder.Logging.AddSimpleConsole(o => o.SingleLine = true);
+            builder.Logging.AddSimpleConsole(o =>
+            {
+                o.SingleLine = true;
+                if (noColor)
+                {
+                    o.ColorBehavior = LoggerColorBehavior.Disabled;
+                }
+            });
             // Logs go to stderr so plan output stays clean for piping.
             builder.Services.Configure<ConsoleLoggerOptions>(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
             builder.Logging.SetMinimumLevel(verbose ? LogLevel.Debug : LogLevel.Warning);
