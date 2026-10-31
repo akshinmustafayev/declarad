@@ -1,0 +1,72 @@
+# A tiered administration model (tier 0 / 1 / 2): one module instance per tier
+# with its OU, admin group, fine-grained password policy and GPO link.
+# Tier 0 admins are added to Domain Admins without managing that group.
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  username = "svc-declarad@corp.local"
+}
+
+variable "tiers" {
+  type = map(object({
+    min_password_length = number
+    max_password_age    = string
+    admins              = list(string)
+  }))
+  default = {
+    "0" = { min_password_length = 20, max_password_age = "30d", admins = ["adm0-jdoe"] }
+    "1" = { min_password_length = 16, max_password_age = "60d", admins = ["adm1-jdoe", "adm1-asmith"] }
+    "2" = { min_password_length = 14, max_password_age = "90d", admins = ["adm2-asmith", "adm2-lchen"] }
+  }
+
+  validation {
+    condition     = alltrue([for k, t in var.tiers : t.min_password_length >= 14])
+    error_message = "Admin passwords must be at least 14 characters."
+  }
+}
+
+variable "admin_initial_password" {
+  type      = string
+  sensitive = true
+  default   = null
+}
+
+data "group" "domain_admins" {
+  sam_account_name = "Domain Admins"
+}
+
+data "gpo" "tier_restrictions" {
+  name = "Tier Logon Restrictions"
+}
+
+ou "admin" {
+  name        = "Admin"
+  description = "Privileged accounts and groups"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+module "tier" {
+  for_each = var.tiers
+  source   = "./modules/tier"
+
+  tier                = each.key
+  parent              = ou.admin.dn
+  admins              = each.value.admins
+  min_password_length = each.value.min_password_length
+  max_password_age    = each.value.max_password_age
+  initial_password    = var.admin_initial_password
+  restrictions_gpo    = data.gpo.tier_restrictions.id
+}
+
+group_membership "domain_admins" {
+  group   = data.group.domain_admins.dn
+  members = [module.tier["0"].admins_group_dn]
+}
+
+output "admin_groups" {
+  value = { for k, t in module.tier : k => t.admins_group_dn }
+}

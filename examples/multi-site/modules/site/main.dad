@@ -1,0 +1,31 @@
+# One branch site: an OU, a DNS zone and a record per server.
+
+variable "name" {
+  type = string
+}
+
+variable "servers" {
+  description = "Host name => IPv4 address."
+  type        = map(string)
+}
+
+ou "site" {
+  name        = title(var.name)
+  description = "Branch site ${title(var.name)}"
+}
+
+dns_zone "site" {
+  name = "${var.name}.${connection.default.domain}"
+}
+
+dns_record "server" {
+  for_each = var.servers
+  zone     = dns_zone.site.name
+  name     = each.key
+  type     = "A"
+  records  = [each.value]
+}
+
+output "zone" {
+  value = dns_zone.site.name
+}

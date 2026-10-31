@@ -1,0 +1,20 @@
+# State in Azure Blob Storage, locked with a blob lease.
+#   export ARM_ACCESS_KEY=...      (or use_azuread_auth = true)
+#   declarad init
+
+declarad {
+  backend "azurerm" {
+    storage_account_name = "corpdeclaradstate"
+    container_name       = "tfstate"
+    key                  = "ad/prod.tfstate"
+  }
+}
+
+connection {
+  server = "dc01.corp.local"
+  domain = "corp.local"
+}
+
+group "state_demo" {
+  description = "Managed with state in Azure"
+}

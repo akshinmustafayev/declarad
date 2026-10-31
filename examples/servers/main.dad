@@ -1,0 +1,65 @@
+# Pre-staged servers and kiosks, a gMSA for a web farm, and SPNs.
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  username = "svc-declarad@corp.local"
+}
+
+variable "web_servers" {
+  type    = set(string)
+  default = ["WEB01", "WEB02", "WEB03"]
+}
+
+variable "kiosk_count" {
+  type    = number
+  default = 4
+}
+
+ou "servers" {
+  name = "Servers"
+}
+
+ou "web" {
+  name = "Web"
+  path = ou.servers.dn
+}
+
+ou "kiosks" {
+  name = "Kiosks"
+}
+
+computer "web" {
+  for_each    = var.web_servers
+  name        = each.key
+  path        = ou.web.dn
+  description = "Intranet web farm node"
+  location    = "London DC1"
+}
+
+computer "kiosk" {
+  count   = var.kiosk_count
+  name    = format("KIOSK%02d", count.index + 1)
+  path    = ou.kiosks.dn
+  enabled = true
+}
+
+group "web_farm" {
+  name        = "Web Farm Hosts"
+  path        = ou.servers.dn
+  description = "Hosts allowed to use svc-intranet"
+  members     = values(computer.web)[*].dn
+}
+
+service_account "intranet" {
+  name                                    = "svc-intranet"
+  description                             = "Intranet application pool identity"
+  dns_host_name                           = "intranet.corp.local"
+  service_principal_names                 = ["HTTP/intranet.corp.local", "HTTP/intranet"]
+  kerberos_encryption_types               = ["aes128", "aes256"]
+  principals_allowed_to_retrieve_password = [group.web_farm.dn]
+}
+
+output "kiosks" {
+  value = computer.kiosk[*].sam_account_name
+}

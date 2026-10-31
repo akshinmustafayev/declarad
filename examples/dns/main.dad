@@ -1,0 +1,87 @@
+# DNS for a branch site: a forward zone, a reverse zone, host records with
+# matching PTRs, aliases, mail and SRV records, plus records in an existing zone.
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  username = "svc-declarad@corp.local"
+}
+
+locals {
+  site = "london"
+  zone = "${local.site}.corp.local"
+  hosts = {
+    files    = "10.20.0.10"
+    printers = "10.20.0.11"
+    wifi-ctl = "10.20.0.12"
+  }
+}
+
+dns_zone "site" {
+  name           = local.zone
+  dynamic_update = "secure"
+  admin_email    = "dns-admins@corp.local"
+  name_servers   = ["dc01.corp.local.", "dc02.corp.local."]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+dns_zone "reverse" {
+  name = "20.10.in-addr.arpa"
+}
+
+dns_record "host" {
+  for_each = local.hosts
+  zone     = dns_zone.site.name
+  name     = each.key
+  type     = "A"
+  records  = [each.value]
+}
+
+dns_record "ptr" {
+  for_each = local.hosts
+  zone     = dns_zone.reverse.name
+  name     = join(".", reverse(slice(split(".", each.value), 2, 4)))
+  type     = "PTR"
+  records  = ["${each.key}.${local.zone}."]
+}
+
+dns_record "fs" {
+  zone    = dns_zone.site.name
+  name    = "fs"
+  type    = "CNAME"
+  records = ["files"]
+}
+
+dns_record "mx" {
+  zone    = dns_zone.site.name
+  name    = "@"
+  type    = "MX"
+  records = ["10 mx1.corp.local.", "20 mx2.corp.local."]
+}
+
+dns_record "spf" {
+  zone    = dns_zone.site.name
+  name    = "@"
+  type    = "TXT"
+  records = ["v=spf1 include:corp.local -all"]
+}
+
+dns_record "sip" {
+  zone    = dns_zone.site.name
+  name    = "_sip._tcp"
+  type    = "SRV"
+  records = ["10 60 5060 sip1.corp.local.", "20 40 5060 sip2.corp.local."]
+  ttl     = 300
+}
+
+# A record set in a zone declarad doesn't manage; nothing else in it is touched.
+dns_record "app" {
+  zone    = "corp.local"
+  name    = "app"
+  type    = "A"
+  records = ["10.0.5.20", "10.0.5.21"]
+  ttl     = 60
+}

@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# declarad working files (the state file itself holds no secrets and may be committed)
+*.state.json.tmp
+*.state.json.lock
+*.state.json.backup
+# declarad working directory: installed modules and backend settings (may contain credentials)
+.declarad/

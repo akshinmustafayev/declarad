@@ -1,0 +1,23 @@
+# State in S3 (or any S3-compatible store), locked with a conditional-write lock file.
+#   declarad init
+# For MinIO/Ceph/LocalStack add: endpoint = "https://minio.corp.local", use_path_style = true
+
+declarad {
+  required_version = ">= 0.3"
+
+  backend "s3" {
+    bucket  = "corp-declarad-state"
+    key     = "ad/prod.tfstate"
+    region  = "eu-west-1"
+    encrypt = true
+  }
+}
+
+connection {
+  server = "dc01.corp.local"
+  domain = "corp.local"
+}
+
+group "state_demo" {
+  description = "Managed with state in S3"
+}

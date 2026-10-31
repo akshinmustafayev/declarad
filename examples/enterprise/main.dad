@@ -1,0 +1,135 @@
+# A larger layout: one module instance per department, shared groups, a
+# fine-grained password policy for admins, GPO links and a gMSA.
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  protocol = "ldaps"
+  username = "svc-declarad@corp.local"
+  password = env("DECLARAD_PASSWORD")
+}
+
+variable "departments" {
+  description = "Departments and their people."
+  type = map(object({
+    manager = string
+    people = list(object({
+      sam        = string
+      first_name = string
+      last_name  = string
+      title      = optional(string)
+      admin      = optional(bool, false)
+    }))
+  }))
+  default = {
+    engineering = {
+      manager = "jdoe"
+      people = [
+        { sam = "jdoe", first_name = "John", last_name = "Doe", title = "Head of Engineering", admin = true },
+        { sam = "asmith", first_name = "Anna", last_name = "Smith", title = "Engineer" },
+      ]
+    }
+    finance = {
+      manager = "bkhan"
+      people = [
+        { sam = "bkhan", first_name = "Bilal", last_name = "Khan", title = "CFO" },
+      ]
+    }
+  }
+
+  validation {
+    condition     = alltrue([for name, d in var.departments : length(d.people) > 0])
+    error_message = "Every department needs at least one person."
+  }
+}
+
+variable "initial_password" {
+  type      = string
+  sensitive = true
+}
+
+locals {
+  all_people = flatten([for dept, d in var.departments : [for p in d.people : merge(p, { dept = dept })]])
+  admins     = [for p in local.all_people : p.sam if p.admin]
+}
+
+data "gpo" "baseline" {
+  name = "Security Baseline"
+}
+
+data "group" "domain_admins" {
+  sam_account_name = "Domain Admins"
+}
+
+ou "corp" {
+  name        = "Corp"
+  description = "Managed by declarad"
+}
+
+module "department" {
+  for_each = var.departments
+  source   = "./modules/department"
+
+  name             = title(each.key)
+  parent           = ou.corp.dn
+  manager          = each.value.manager
+  people           = each.value.people
+  initial_password = var.initial_password
+}
+
+group "all_staff" {
+  name     = "All Staff"
+  path     = ou.corp.dn
+  scope    = "universal"
+  category = "distribution"
+  email    = "all@corp.local"
+  members  = flatten([for d in module.department : d.member_dns])
+}
+
+# Admins get the stricter policy and Domain Admins membership.
+group "tier0_admins" {
+  name    = "Tier 0 Admins"
+  path    = ou.corp.dn
+  members = local.admins
+}
+
+password_policy "tier0" {
+  precedence          = 10
+  min_password_length = 16
+  max_password_age    = "60d"
+  lockout_threshold   = 5
+  lockout_duration    = "never"
+  applies_to          = [group.tier0_admins.dn]
+}
+
+group_membership "domain_admins" {
+  group   = data.group.domain_admins.dn
+  members = [group.tier0_admins.dn]
+}
+
+gpo_link "baseline" {
+  gpo      = data.gpo.baseline.id
+  target   = ou.corp.dn
+  enforced = true
+  order    = 1
+}
+
+service_account "svc_reports" {
+  description                             = "Reporting service"
+  service_principal_names                 = ["HTTP/reports.corp.local"]
+  principals_allowed_to_retrieve_password = [group.report_servers.dn]
+}
+
+group "report_servers" {
+  path = ou.corp.dn
+}
+
+# The finance OU used to be declared at the top level.
+moved {
+  from = ou.finance
+  to   = module.department["finance"].ou.department
+}
+
+output "department_ous" {
+  value = { for name, d in module.department : name => d.ou_dn }
+}

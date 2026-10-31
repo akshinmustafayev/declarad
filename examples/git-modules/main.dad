@@ -1,0 +1,22 @@
+# Modules from git, pinned to tags. Run `declarad init` to download them
+# (and `declarad init --upgrade` after changing a ref).
+
+connection {
+  server = "dc01.corp.local"
+  domain = "corp.local"
+}
+
+module "baseline" {
+  source = "git::https://git.corp.local/identity/declarad-modules.git//baseline?ref=v2.1.0"
+  domain = "corp.local"
+}
+
+module "branch" {
+  for_each = toset(["london", "boston"])
+  source   = "git::ssh://git@git.corp.local/identity/declarad-modules.git//site?ref=v2.1.0"
+  name     = each.key
+}
+
+module "shared_groups" {
+  source = "https://artifacts.corp.local/declarad/shared-groups-1.4.0.zip"
+}

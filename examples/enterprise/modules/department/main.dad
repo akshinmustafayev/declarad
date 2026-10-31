@@ -1,0 +1,67 @@
+# One department: an OU, its people, a security group and a manager link.
+
+variable "name" {
+  type = string
+}
+
+variable "parent" {
+  type = string
+}
+
+variable "manager" {
+  type = string
+}
+
+variable "people" {
+  type = list(object({
+    sam        = string
+    first_name = string
+    last_name  = string
+    title      = optional(string)
+  }))
+}
+
+variable "initial_password" {
+  type      = string
+  sensitive = true
+}
+
+ou "department" {
+  name = var.name
+  path = var.parent
+}
+
+user "person" {
+  for_each = { for p in var.people : p.sam => p }
+
+  sam_account_name = each.key
+  given_name       = each.value.first_name
+  surname          = each.value.last_name
+  title            = each.value.title
+  department       = var.name
+  email            = "${each.key}@corp.local"
+  path             = ou.department.dn
+  manager          = each.key == var.manager ? null : user.person[var.manager].dn
+
+  initial_password         = var.initial_password
+  change_password_at_logon = true
+
+  lifecycle {
+    ignore_changes = [phone, mobile]
+  }
+}
+
+group "department" {
+  name        = "${var.name} Team"
+  path        = ou.department.dn
+  description = "Members of ${var.name}"
+  members     = [for u in user.person : u.dn]
+}
+
+output "ou_dn" {
+  value = ou.department.dn
+}
+
+output "member_dns" {
+  value = values(user.person)[*].dn
+}

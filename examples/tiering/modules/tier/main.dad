@@ -1,0 +1,69 @@
+variable "tier" {
+  type = string
+}
+
+variable "parent" {
+  type = string
+}
+
+variable "admins" {
+  type = list(string)
+}
+
+variable "min_password_length" {
+  type = number
+}
+
+variable "max_password_age" {
+  type = string
+}
+
+variable "initial_password" {
+  type     = string
+  nullable = true
+}
+
+variable "restrictions_gpo" {
+  type = string
+}
+
+ou "tier" {
+  name = "Tier ${var.tier}"
+  path = var.parent
+}
+
+user "admin" {
+  for_each         = toset(var.admins)
+  sam_account_name = each.key
+  path             = ou.tier.dn
+  description      = "Tier ${var.tier} administrator"
+  enabled          = var.initial_password != null
+  initial_password = var.initial_password
+}
+
+group "admins" {
+  name        = "Tier ${var.tier} Admins"
+  path        = ou.tier.dn
+  description = "Administrators of tier ${var.tier}"
+  members     = values(user.admin)[*].dn
+}
+
+password_policy "tier" {
+  name                = "Tier ${var.tier} Admins"
+  precedence          = 10 + tonumber(var.tier)
+  min_password_length = var.min_password_length
+  max_password_age    = var.max_password_age
+  lockout_threshold   = 5
+  lockout_duration    = "30m"
+  applies_to          = [group.admins.dn]
+}
+
+gpo_link "restrictions" {
+  gpo      = var.restrictions_gpo
+  target   = ou.tier.dn
+  enforced = true
+}
+
+output "admins_group_dn" {
+  value = group.admins.dn
+}

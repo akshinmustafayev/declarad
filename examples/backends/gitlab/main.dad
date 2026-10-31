@@ -1,0 +1,23 @@
+# GitLab-managed state through the HTTP backend.
+#   export TF_HTTP_PASSWORD=<personal or job token>
+#   declarad init
+
+declarad {
+  backend "http" {
+    address        = "https://gitlab.corp.local/api/v4/projects/42/terraform/state/ad-prod"
+    lock_address   = "https://gitlab.corp.local/api/v4/projects/42/terraform/state/ad-prod/lock"
+    unlock_address = "https://gitlab.corp.local/api/v4/projects/42/terraform/state/ad-prod/lock"
+    lock_method    = "POST"
+    unlock_method  = "DELETE"
+    username       = "declarad-ci"
+  }
+}
+
+connection {
+  server = "dc01.corp.local"
+  domain = "corp.local"
+}
+
+group "state_demo" {
+  description = "Managed with state in GitLab"
+}

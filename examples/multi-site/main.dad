@@ -1,0 +1,70 @@
+# Two domains managed from one configuration, with DNS for each branch site.
+# State is kept in S3 so the whole team shares it:
+#   declarad init --backend-config bucket=<your-bucket>
+
+declarad {
+  required_version = ">= 0.3"
+
+  backend "s3" {
+    key    = "ad/multi-site.tfstate"
+    region = "eu-west-1"
+  }
+}
+
+connection {
+  server   = "dc01.hq.corp.local"
+  domain   = "hq.corp.local"
+  username = "svc-declarad@hq.corp.local"
+  password = env("DECLARAD_PASSWORD")
+}
+
+connection "eu" {
+  server   = "dc01.eu.corp.local"
+  domain   = "eu.corp.local"
+  username = "svc-declarad@eu.corp.local"
+  password = env("DECLARAD_EU_PASSWORD")
+}
+
+variable "sites" {
+  type = map(object({
+    domain  = string
+    subnet  = string
+    servers = map(string)
+  }))
+  default = {
+    london = {
+      domain  = "eu"
+      subnet  = "10.20"
+      servers = { files = "10.20.0.10", print = "10.20.0.11" }
+    }
+    boston = {
+      domain  = "default"
+      subnet  = "10.30"
+      servers = { files = "10.30.0.10" }
+    }
+  }
+}
+
+module "site_eu" {
+  for_each    = { for name, s in var.sites : name => s if s.domain == "eu" }
+  source      = "./modules/site"
+  connections = { default = connection.eu }
+
+  name    = each.key
+  servers = each.value.servers
+}
+
+module "site_hq" {
+  for_each = { for name, s in var.sites : name => s if s.domain == "default" }
+  source   = "./modules/site"
+
+  name    = each.key
+  servers = each.value.servers
+}
+
+output "site_zones" {
+  value = merge(
+    { for name, m in module.site_eu : name => m.zone },
+    { for name, m in module.site_hq : name => m.zone },
+  )
+}

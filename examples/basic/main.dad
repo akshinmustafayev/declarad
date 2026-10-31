@@ -1,0 +1,34 @@
+# The smallest useful configuration: an OU, a group and a user.
+#   export DECLARAD_PASSWORD=... ALICE_PASSWORD=...
+#   declarad plan && declarad apply
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  username = "svc-declarad@corp.local"
+  password = env("DECLARAD_PASSWORD", null)
+}
+
+ou "lab" {
+  name                               = "declarad-lab"
+  description                        = "Playground for declarad"
+  protected_from_accidental_deletion = false
+}
+
+group "lab_admins" {
+  name    = "Lab Admins"
+  path    = ou.lab.dn
+  members = [user.alice.dn]
+}
+
+user "alice" {
+  given_name               = "Alice"
+  surname                  = "Example"
+  path                     = ou.lab.dn
+  initial_password         = env("ALICE_PASSWORD", "Change-Me-Now-1!")
+  change_password_at_logon = true
+}
+
+output "alice_upn" {
+  value = user.alice.user_principal_name
+}

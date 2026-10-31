@@ -1,0 +1,73 @@
+# Bulk-manage users from an HR export. Each CSV row becomes user.staff["<sam>"].
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  protocol = "ldaps"
+  username = "svc-declarad@corp.local"
+  password = env("DECLARAD_PASSWORD")
+}
+
+variable "initial_password" {
+  description = "Initial password for new accounts (they must change it at first logon)"
+  type        = "string"
+}
+
+locals {
+  rows        = csvdecode(file("users.csv"))
+  users       = { for r in local.rows : r.sam => r }
+  departments = { for r in local.rows : r.department => r.sam... }
+}
+
+ou "corp" {
+  name        = "Corp"
+  description = "Managed by declarad"
+}
+
+ou "staff" {
+  name = "Staff"
+  path = ou.corp.dn
+}
+
+ou "disabled" {
+  name = "Disabled Accounts"
+  path = ou.corp.dn
+}
+
+user "staff" {
+  for_each = local.users
+
+  sam_account_name = each.key
+  given_name       = each.value.first_name
+  surname          = each.value.last_name
+  email            = "${each.key}@corp.local"
+  title            = each.value.title
+  department       = each.value.department
+  enabled          = each.value.active == "yes"
+  path             = each.value.active == "yes" ? ou.staff.dn : ou.disabled.dn
+
+  initial_password         = var.initial_password
+  change_password_at_logon = true
+
+  lifecycle {
+    # The helpdesk maintains phone numbers by hand.
+    ignore_changes = [phone]
+  }
+}
+
+# One group per department, generated from the CSV.
+group "department" {
+  for_each = local.departments
+  name     = "Dept ${each.key}"
+  path     = ou.corp.dn
+  members  = [for sam in each.value : user.staff[sam].dn]
+}
+
+group "all_staff" {
+  name     = "All Staff"
+  path     = ou.corp.dn
+  scope    = "universal"
+  category = "distribution"
+  email    = "all@corp.local"
+  members  = [for u in user.staff : u.dn if u.enabled]
+}

@@ -1,0 +1,6 @@
+sam,first_name,last_name,title,department,office,manager,active
+jdoe,John,Doe,Head of Engineering,Engineering,London,,yes
+asmith,Anna,Smith,Engineer,Engineering,London,jdoe,yes
+lchen,Li,Chen,Engineer,Engineering,Boston,jdoe,yes
+bkhan,Bilal,Khan,CFO,Finance,Boston,,yes
+mold,Mark,Old,Analyst,Finance,Boston,bkhan,no

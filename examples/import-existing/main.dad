@@ -1,0 +1,53 @@
+# Bringing existing objects under management and refactoring safely.
+
+connection {
+  server   = "dc01.corp.local"
+  domain   = "corp.local"
+  username = "svc-declarad@corp.local"
+}
+
+# Adopt an existing group; the plan shows "imported from ..." plus any differences.
+group "vpn_users" {
+  name        = "VPN Users"
+  path        = "OU=Groups,DC=corp,DC=local"
+  description = "Remote access via the VPN"
+}
+
+import {
+  to = group.vpn_users
+  id = "CN=VPN Users,OU=Groups,DC=corp,DC=local"
+}
+
+# The OU used to be declared as ou.old_staff; keep the object, change the address.
+ou "staff" {
+  name = "Staff"
+}
+
+moved {
+  from = ou.old_staff
+  to   = ou.staff
+}
+
+# Reference objects owned by others without managing them.
+data "user" "ceo" {
+  sam_account_name = "jsmith"
+}
+
+data "objects" "contractors" {
+  filter     = "(&(objectCategory=person)(objectClass=user)(employeeType=Contractor))"
+  attributes = ["sAMAccountName"]
+}
+
+group "contractors" {
+  name        = "All Contractors"
+  path        = ou.staff.dn
+  description = "Generated from employeeType"
+  members     = data.objects.contractors.dns
+  managed_by  = data.user.ceo.dn
+}
+
+# Add to a built-in group without managing all of its members.
+group_membership "remote_desktop" {
+  group   = "Remote Desktop Users"
+  members = [group.vpn_users.dn]
+}
