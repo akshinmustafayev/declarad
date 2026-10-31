@@ -1,4 +1,5 @@
 using Declarad.Hcl;
+using Declarad.Hcl.Values;
 
 namespace Declarad.Tests
 {

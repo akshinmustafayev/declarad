@@ -1,30 +1,12 @@
 using System.Text;
 using Declarad.Directory;
 using Declarad.Engine;
-using Declarad.Hcl;
+using Declarad.Hcl.Values;
+using Declarad.Resources.Schema;
 using Microsoft.Extensions.Logging;
 
 namespace Declarad.Resources
 {
-    /// <summary>userAccountControl flags shared by users, computers and service accounts.</summary>
-    internal static class Uac
-    {
-        public const long AccountDisable = 0x2;
-        public const long PasswordNotRequired = 0x20;
-        public const long NormalAccount = 0x200;
-        public const long WorkstationTrust = 0x1000;
-        public const long DontExpirePassword = 0x10000;
-
-        public static long Set(long uac, long flag, bool? on) => on switch
-        {
-            true => uac | flag,
-            false => uac & ~flag,
-            null => uac,
-        };
-
-        public static long WithEnabled(long uac, Value enabled) => Set(uac, AccountDisable, V.Bool(enabled) is { } e ? !e : null);
-    }
-
     public sealed class UserResource : ResourceType
     {
         private static readonly char[] InvalidSamChars = "\"/\\[]:;|=,+*?<>@".ToCharArray();
@@ -243,43 +225,6 @@ namespace Declarad.Resources
             {
                 yield return Modification.Replace("accountExpires", AccountExpiry.ToLdap(V.Str(expiry.New) ?? AccountExpiry.Never));
             }
-        }
-    }
-
-    /// <summary>accountExpires is a FILETIME; 0 and 0x7FFFFFFFFFFFFFFF both mean "never".</summary>
-    internal static class AccountExpiry
-    {
-        public const string Never = "never";
-
-        public static bool TryParse(string text, out DateTime? date)
-        {
-            date = null;
-            if (text.Equals(Never, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-            if (DateTime.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var d))
-            {
-                date = d;
-                return true;
-            }
-            return false;
-        }
-
-        public static Value Normalize(Value v) =>
-            v is StringValue s && TryParse(s.V, out var d) ? Value.From(d == null ? Never : d.Value.ToString("yyyy-MM-dd")) : v;
-
-        public static string ToLdap(string text) =>
-            TryParse(text, out var d) && d != null ? d.Value.ToFileTimeUtc().ToString() : "9223372036854775807";
-
-        public static Value FromLdap(string? raw)
-        {
-            if (raw == null || !long.TryParse(raw, out long ft) || ft == 0 || ft == long.MaxValue)
-            {
-                return Value.From(Never);
-            }
-            return Value.From(DateTime.FromFileTimeUtc(ft).ToString("yyyy-MM-dd"));
         }
     }
 }

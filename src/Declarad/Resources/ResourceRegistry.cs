@@ -1,3 +1,5 @@
+using Declarad.Resources.Dns;
+
 namespace Declarad.Resources
 {
     public static class ResourceRegistry

@@ -1,20 +1,12 @@
 using Declarad.Directory;
-using Declarad.Hcl;
+using Declarad.Hcl.Values;
 using Declarad.Resources;
+using Declarad.Resources.Schema;
 using Declarad.State;
 using Microsoft.Extensions.Logging;
 
 namespace Declarad.Engine
 {
-    public sealed class ApplyResult
-    {
-        public int Created { get; set; }
-        public int Updated { get; set; }
-        public int Deleted { get; set; }
-        public List<string> Errors { get; } = new();
-        public bool Success => Errors.Count == 0;
-    }
-
     /// <summary>
     /// Executes a <see cref="Plan"/> in three phases:
     /// 1. create/rename/move/update objects in dependency order,

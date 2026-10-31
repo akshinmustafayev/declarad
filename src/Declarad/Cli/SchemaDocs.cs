@@ -1,5 +1,7 @@
 using System.Text;
 using Declarad.Resources;
+using Declarad.Resources.DataSources;
+using Declarad.Resources.Schema;
 
 namespace Declarad.Cli
 {

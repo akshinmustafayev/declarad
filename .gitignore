@@ -367,3 +367,7 @@ FodyWeavers.xsd
 *.state.json.backup
 # declarad working directory: installed modules and backend settings (may contain credentials)
 .declarad/
+
+# Release builds (build/build.sh, build/build.ps1)
+build/out/
+build/dist/

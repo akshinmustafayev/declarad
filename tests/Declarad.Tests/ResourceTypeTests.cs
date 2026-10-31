@@ -2,9 +2,9 @@ using Declarad.Config;
 using Declarad.Directory;
 using Declarad.Engine;
 using Declarad.Export;
-using Declarad.Hcl;
-using Declarad.Resources;
+using Declarad.Hcl.Values;
 using Declarad.State;
+using Declarad.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Declarad.Tests
@@ -305,7 +305,7 @@ namespace Declarad.Tests
             Apply(Plan(config));
             Assert.Equal(2, _dir.Get("CN=Engineering All,OU=Engineering,DC=corp,DC=local")!.GetAll("member").Length);
             Assert.NotNull(_state.Find("module.eng.user.u[\"jdoe\"]"));
-            Assert.Empty(Plan(config).Changes.Where(c => c.Action != ChangeAction.NoOp));
+            Assert.DoesNotContain(Plan(config).Changes, c => c.Action != ChangeAction.NoOp);
 
             var destroy = Plan(config, new PlanOptions { Destroy = true });
             Assert.Equal(4, destroy.ToDestroy);

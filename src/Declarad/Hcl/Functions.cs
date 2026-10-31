@@ -2,9 +2,9 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Declarad.Directory;
+using Declarad.Hcl.Values;
 
 namespace Declarad.Hcl
 {

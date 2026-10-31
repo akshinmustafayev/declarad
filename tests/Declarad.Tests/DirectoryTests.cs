@@ -1,4 +1,5 @@
 using Declarad.Directory;
+using Declarad.Tests.Support;
 
 namespace Declarad.Tests
 {

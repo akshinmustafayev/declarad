@@ -1,26 +1,11 @@
 using System.Collections.Immutable;
 using System.Text;
+using Declarad.Hcl.Syntax;
+using Declarad.Hcl.Values;
+using Index = Declarad.Hcl.Syntax.Index;
 
 namespace Declarad.Hcl
 {
-    /// <summary>
-    /// Resolves the root of a reference (e.g. <c>var</c>, <c>ou</c>). Returns the resolved value and how many
-    /// traversal steps it consumed; the evaluator applies the remaining steps generically.
-    /// </summary>
-    public interface IReferenceResolver
-    {
-        (Value Value, int Consumed) Resolve(ScopeTraversalExpr reference, Func<Expr, Value> evaluate);
-    }
-
-    /// <summary>A resolver for contexts without references (template files, variable defaults).</summary>
-    public sealed class NoReferences : IReferenceResolver
-    {
-        public static readonly NoReferences Instance = new();
-
-        public (Value Value, int Consumed) Resolve(ScopeTraversalExpr reference, Func<Expr, Value> evaluate) =>
-            throw new DeclaradException($"Unknown name '{reference.Root}'; no references are available here.", reference.Pos);
-    }
-
     /// <summary>
     /// Evaluates expressions. Unknown values propagate: any operation on an unknown value yields unknown.
     /// </summary>

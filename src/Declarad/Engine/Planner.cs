@@ -1,26 +1,12 @@
 using Declarad.Config;
 using Declarad.Directory;
-using Declarad.Hcl;
+using Declarad.Hcl.Values;
 using Declarad.Resources;
+using Declarad.Resources.Schema;
 using Declarad.State;
 
 namespace Declarad.Engine
 {
-    public sealed record PlanOptions
-    {
-        /// <summary>Take existing objects that match a new resource's DN under management instead of failing.</summary>
-        public bool Adopt { get; init; }
-
-        /// <summary>Plan the deletion of everything in state.</summary>
-        public bool Destroy { get; init; }
-
-        /// <summary>Whether the connection is encrypted (passwords can only be set over LDAPS/StartTLS).</summary>
-        public bool Encrypted { get; init; } = true;
-
-        /// <summary>Limit the plan to these addresses (and resources inside these modules); empty means everything.</summary>
-        public IReadOnlyList<string> Targets { get; init; } = Array.Empty<string>();
-    }
-
     /// <summary>
     /// Compares the configuration with the directory (located through state by objectGUID) and produces an
     /// ordered <see cref="Plan"/>: creates and updates in dependency order, then deletes (attachments first,

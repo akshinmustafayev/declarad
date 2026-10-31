@@ -1,5 +1,5 @@
 using Declarad.Config;
-using Declarad.Hcl;
+using Declarad.Config.Modules;
 
 namespace Declarad.Tests
 {

@@ -1,6 +1,7 @@
 using Declarad.Directory;
 using Declarad.Engine;
-using Declarad.Hcl;
+using Declarad.Hcl.Values;
+using Declarad.Resources.Schema;
 using Microsoft.Extensions.Logging;
 
 namespace Declarad.Resources

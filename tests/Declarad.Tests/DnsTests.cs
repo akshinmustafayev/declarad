@@ -1,9 +1,10 @@
 using Declarad.Config;
 using Declarad.Engine;
 using Declarad.Export;
-using Declarad.Hcl;
 using Declarad.Resources;
+using Declarad.Resources.Dns;
 using Declarad.State;
+using Declarad.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Declarad.Tests

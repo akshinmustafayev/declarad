@@ -1,7 +1,10 @@
 using System.Text;
 using Declarad.Directory;
 using Declarad.Hcl;
+using Declarad.Hcl.Values;
 using Declarad.Resources;
+using Declarad.Resources.Dns;
+using Declarad.Resources.Schema;
 
 namespace Declarad.Export
 {

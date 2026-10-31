@@ -7,18 +7,27 @@ This page is for people changing declarad itself.
 ```
 src/Declarad/
   Program.cs        Cocona host, logging
-  Cli/              commands, plan rendering, console UI, schema docs
-  Hcl/              the language: lexer, parser, syntax tree, evaluator, values, functions, type constraints, formatter
-  Config/           loading a configuration: modules, scopes, references, for_each/count, connections, settings, module sources
-  Resources/        resource types (schema + LDAP mapping + apply logic), data sources, DNS codec
+  Cli/              commands, state commands, plan rendering, console UI, schema docs
+  Hcl/              the language: lexer, parser, evaluator, functions, type constraints, formatter
+    Syntax/         syntax tree: Body, Block, Attribute, expressions, traversers
+    Values/         Value and its kinds (null, unknown, string, bool, number, list, object)
+  Config/           loading a configuration: scopes, references, for_each/count, connections, settings
+    Modules/        module calls and instances, sources, installer, manifest
+  Resources/        resource types (schema + LDAP mapping + apply logic)
+    Schema/         AttributeSpec, attribute types and LDAP formats, shared specs
+    DataSources/    data source types and their registry
+    Dns/            dns_zone, dns_record and the dnsRecord codec
   Directory/        IDirectory and its LDAP implementation, DN/SID helpers, security descriptor editing
   Engine/           planner (diff + ordering) and applier (phased execution)
-  State/            state model, backends (local, http, s3, azurerm), locking
+  State/            state model and store
+    Backends/       backends (local, http, s3, azurerm), locking, StateManager
   Export/           directory → configuration
 tests/Declarad.Tests/
-  InMemoryDirectory.cs   an AD emulation enforcing the rules the engine depends on
-  *Tests.cs              unit, engine and integration tests
+  Support/          InMemoryDirectory (an AD emulation enforcing the rules the engine depends on), test attributes
+  *Tests.cs         unit, engine and integration tests
 ```
+
+Each class, record, interface and enum has its own file, named after the type. The exceptions are small families that only make sense together: the `Expr` records (`Hcl/Syntax/Expressions.cs`), the traversal steps (`Hcl/Syntax/Traversers.cs`) and the template parts (`Hcl/TemplatePart.cs`). Namespaces match the folders (`Declarad.Hcl.Syntax`, `Declarad.Resources.Dns`, ...). Where a type name clashes with a `System` type (`Attribute`, `Index`), files that use it import it with an alias such as `using Index = Declarad.Hcl.Syntax.Index;`.
 
 ## A run, end to end
 
@@ -36,7 +45,7 @@ declarad apply
 ### Hcl
 
 - `Lexer` produces tokens; strings and heredocs become *template parts* (literals, `${}` interpolations, `%{}` directives with strip flags).
-- `Parser` is recursive descent with precedence climbing and produces `Body`/`Block`/`Attribute`/`Expr` records (`Syntax.cs`).
+- `Parser` is recursive descent with precedence climbing and produces `Body`/`Block`/`Attribute`/`Expr` records (`Hcl/Syntax/`).
 - `Evaluator` evaluates expressions. Name resolution is delegated to an `IReferenceResolver` (the module scope); local names of `for` expressions and template `for` loops live in a scope stack. `Value.Unknown` propagates through every operation. `try`/`can` are special forms.
 - `Functions` is a table of name → (arity, implementation).
 - `TypeConstraint` parses `list(object({...}))` from expressions and converts values.

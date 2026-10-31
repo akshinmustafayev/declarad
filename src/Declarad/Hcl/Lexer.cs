@@ -3,41 +3,6 @@ using System.Text;
 
 namespace Declarad.Hcl
 {
-    public enum TokenKind
-    {
-        Ident,
-        Number,
-        Template,
-        LBrace, RBrace, LBracket, RBracket, LParen, RParen,
-        Equals, Comma, Dot, Ellipsis, Colon, Question, FatArrow,
-        Bang, EqualEqual, NotEqual, AndAnd, OrOr,
-        Plus, Minus, Star, Slash, Percent,
-        Less, LessEqual, Greater, GreaterEqual,
-        Newline,
-        Eof,
-    }
-
-    /// <summary>Part of a string template: literal text, an interpolation <c>${...}</c> or a directive <c>%{...}</c>.</summary>
-    public abstract record TemplatePart;
-    public sealed record LiteralPart(string Text) : TemplatePart;
-
-    /// <summary>
-    /// The source of an interpolation or directive. <paramref name="StripLeft"/>/<paramref name="StripRight"/>
-    /// are the <c>~</c> markers that trim whitespace from the adjacent literal text.
-    /// </summary>
-    public sealed record InterpolationPart(string Source, SourcePos Pos, bool StripLeft = false, bool StripRight = false, bool IsDirective = false) : TemplatePart;
-
-    public sealed record Token(TokenKind Kind, string Text, SourcePos Pos, IReadOnlyList<TemplatePart>? Parts = null)
-    {
-        public override string ToString() => Kind switch
-        {
-            TokenKind.Newline => "newline",
-            TokenKind.Eof => "end of file",
-            TokenKind.Template => "string",
-            _ => $"'{Text}'",
-        };
-    }
-
     /// <summary>
     /// Tokenizer for HCL native syntax: identifiers, numbers, quoted templates and heredocs (with
     /// <c>${}</c> interpolations and <c>%{}</c> directives), operators and the three comment styles.

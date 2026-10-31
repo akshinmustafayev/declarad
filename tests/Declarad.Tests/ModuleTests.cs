@@ -1,5 +1,6 @@
 using Declarad.Config;
-using Declarad.Hcl;
+using Declarad.Hcl.Values;
+using Declarad.Tests.Support;
 
 namespace Declarad.Tests
 {

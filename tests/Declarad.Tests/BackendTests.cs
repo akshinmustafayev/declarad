@@ -7,8 +7,10 @@ using Azure.Storage.Blobs;
 using Declarad.Cli;
 using Declarad.Config;
 using Declarad.Hcl;
+using Declarad.Hcl.Values;
 using Declarad.State;
 using Declarad.State.Backends;
+using Declarad.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Declarad.Tests

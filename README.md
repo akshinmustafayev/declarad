@@ -51,6 +51,8 @@ dotnet test
 dotnet publish src/Declarad -c Release -o out   # produces out/declarad
 ```
 
+Release zips for Windows, Linux and macOS (x64 and arm64, self-contained or framework-dependent) are built with `build/build.sh` or `build/build.ps1`; see [build/README.md](build/README.md).
+
 ## Commands
 
 | Command | Purpose |

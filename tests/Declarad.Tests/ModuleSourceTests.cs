@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using Declarad.Config;
+using Declarad.Config.Modules;
 
 namespace Declarad.Tests
 {
@@ -75,7 +76,7 @@ namespace Declarad.Tests
             Assert.Equal(2, new ModuleInstaller(root, upgrade: false, log.Add).Install());
             Assert.Single(log);
             var config = ConfigLoader.Load(root);
-            Assert.Equal(Hcl.Value.From("Eng v1"), config.Find("module.team.group.team")!.Get("name"));
+            Assert.Equal(Hcl.Values.Value.From("Eng v1"), config.Find("module.team.group.team")!.Get("name"));
             Assert.NotNull(config.Find("module.team.module.nested.group.shared"));
 
             // Re-running init does not download again.
@@ -86,11 +87,11 @@ namespace Declarad.Tests
             var changed = Assert.ThrowsAny<DeclaradException>(() => ConfigLoader.Load(root));
             Assert.Contains("changed", changed is ConfigErrorsException c2 ? c2.Errors[0].Message : changed.Message);
             new ModuleInstaller(root, upgrade: false, log.Add).Install();
-            Assert.Equal(Hcl.Value.From("Eng v2"), ConfigLoader.Load(root).Find("module.team.group.team")!.Get("name"));
+            Assert.Equal(Hcl.Values.Value.From("Eng v2"), ConfigLoader.Load(root).Find("module.team.group.team")!.Get("name"));
         }
 
         [Fact]
-        public void InstallsArchiveModulesOverHttp()
+        public async Task InstallsArchiveModulesOverHttp()
         {
             using var zip = new MemoryStream();
             using (var archive = new ZipArchive(zip, ZipArchiveMode.Create, leaveOpen: true))
@@ -118,8 +119,8 @@ namespace Declarad.Tests
             string root = System.IO.Directory.CreateTempSubdirectory("dad-zip").FullName;
             File.WriteAllText(Path.Combine(root, "main.dad"), Root($"http://127.0.0.1:{port}/team.zip//team"));
             new ModuleInstaller(root, upgrade: false, _ => { }).Install();
-            server.Wait(TimeSpan.FromSeconds(10));
-            Assert.Equal(Hcl.Value.From("Eng"), ConfigLoader.Load(root).Find("module.team.group.team")!.Get("name"));
+            await server.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(Hcl.Values.Value.From("Eng"), ConfigLoader.Load(root).Find("module.team.group.team")!.Get("name"));
         }
     }
 }

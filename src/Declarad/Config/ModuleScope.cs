@@ -1,90 +1,15 @@
+using Declarad.Config.Modules;
 using Declarad.Directory;
 using Declarad.Hcl;
+using Declarad.Hcl.Syntax;
+using Declarad.Hcl.Values;
 using Declarad.Resources;
-using Attribute = Declarad.Hcl.Attribute;
+using Declarad.Resources.DataSources;
+using Declarad.Resources.Schema;
+using Attribute = Declarad.Hcl.Syntax.Attribute;
 
 namespace Declarad.Config
 {
-    /// <summary>A block that may expand into several instances through for_each or count.</summary>
-    internal abstract class Expandable
-    {
-        public required ModuleScope Scope { get; init; }
-        public required Block Block { get; init; }
-        public string Label => Block.Labels[^1];
-        public Attribute? ForEach => Block.Body.GetAttribute("for_each");
-        public Attribute? Count => Block.Body.GetAttribute("count");
-        public bool IsExpanded => ForEach != null || Count != null;
-        public List<Instance>? Instances { get; set; }
-        public bool Expanding { get; set; }
-        public bool UnknownExpansion { get; set; }
-        public HashSet<string> ExpansionDeps { get; } = new(StringComparer.Ordinal);
-        public abstract string Describe { get; }
-        public abstract Instance NewInstance(Value? key, Value eachKey, Value eachValue);
-    }
-
-    internal class Instance
-    {
-        public required Expandable Owner { get; init; }
-        public Value? Key { get; init; }
-        public Value EachKey { get; init; } = Value.Null;
-        public Value EachValue { get; init; } = Value.Null;
-    }
-
-    internal sealed class ResourceBlock : Expandable
-    {
-        public required ResourceType Type { get; init; }
-        public override string Describe => ResourceInstance.FormatAddress(Scope.Prefix, Type.Name, Label, null);
-
-        public override Instance NewInstance(Value? key, Value eachKey, Value eachValue) => new ResourceInst
-        {
-            Owner = this,
-            Key = key,
-            EachKey = eachKey,
-            EachValue = eachValue,
-            Result = new ResourceInstance { Type = Type, Name = Label, Key = key, ModulePath = Scope.Prefix, Pos = Block.Pos, Connection = Scope.ConnectionOf(Block) },
-        };
-    }
-
-    internal sealed class ResourceInst : Instance
-    {
-        public required ResourceInstance Result { get; init; }
-        public Dictionary<string, Value> Memo { get; } = new(StringComparer.Ordinal);
-        public HashSet<string> InProgress { get; } = new(StringComparer.Ordinal);
-        public ResourceBlock Block => (ResourceBlock)Owner;
-    }
-
-    internal sealed class DataBlock : Expandable
-    {
-        public required DataSourceType Type { get; init; }
-        public override string Describe => (Scope.Prefix.Length > 0 ? Scope.Prefix + "." : "") + $"data.{Type.Name}.{Label}";
-        public override Instance NewInstance(Value? key, Value eachKey, Value eachValue) => new DataInst { Owner = this, Key = key, EachKey = eachKey, EachValue = eachValue };
-    }
-
-    internal sealed class DataInst : Instance
-    {
-        public Value? Result { get; set; }
-        public HashSet<string> Deps { get; set; } = new(StringComparer.Ordinal);
-        public bool Evaluating { get; set; }
-    }
-
-    internal sealed class ModuleCall : Expandable
-    {
-        public override string Describe => (Scope.Prefix.Length > 0 ? Scope.Prefix + "." : "") + $"module.{Label}";
-
-        public override Instance NewInstance(Value? key, Value eachKey, Value eachValue)
-        {
-            var inst = new ModuleInst { Owner = this, Key = key, EachKey = eachKey, EachValue = eachValue };
-            string prefix = (Scope.Prefix.Length > 0 ? Scope.Prefix + "." : "") + $"module.{Label}" + (key == null ? "" : ResourceInstance.FormatKey(key));
-            inst.Child = Scope.CreateChild(this, inst, prefix);
-            return inst;
-        }
-    }
-
-    internal sealed class ModuleInst : Instance
-    {
-        public ModuleScope Child { get; set; } = null!;
-    }
-
     /// <summary>
     /// One module instance: its variables, locals, outputs, resources, data sources and module calls. Resolves
     /// references for expressions evaluated in this module.
@@ -691,7 +616,7 @@ namespace Declarad.Config
                     case GetAttr g:
                         parts.Append('.').Append(g.Name);
                         break;
-                    case Hcl.Index { Key: LiteralExpr { Value: var key } } when key is StringValue or NumberValue:
+                    case Hcl.Syntax.Index { Key: LiteralExpr { Value: var key } } when key is StringValue or NumberValue:
                         parts.Append(ResourceInstance.FormatKey(key));
                         break;
                     default:
@@ -1430,7 +1355,7 @@ namespace Declarad.Config
                     {
                         return (EvalData((DataInst)instances[0]), 2);
                     }
-                    if (steps.Count > 2 && steps[2] is Hcl.Index index)
+                    if (steps.Count > 2 && steps[2] is Hcl.Syntax.Index index)
                     {
                         var key = evaluate(index.Key);
                         return key.IsUnknown || block.UnknownExpansion ? (Value.Unknown, 3) : (EvalData((DataInst)FindInstance(block, instances, key, index.Pos)), 3);
@@ -1451,7 +1376,7 @@ namespace Declarad.Config
                     {
                         inst = (ModuleInst)instances[0];
                     }
-                    else if (steps.Count > 1 && steps[1] is Hcl.Index index)
+                    else if (steps.Count > 1 && steps[1] is Hcl.Syntax.Index index)
                     {
                         var key = evaluate(index.Key);
                         if (key.IsUnknown || call.UnknownExpansion)
@@ -1488,7 +1413,7 @@ namespace Declarad.Config
             {
                 target = (ResourceInst)all[0];
             }
-            else if (steps.Count > 1 && steps[1] is Hcl.Index idx)
+            else if (steps.Count > 1 && steps[1] is Hcl.Syntax.Index idx)
             {
                 var key = evaluate(idx.Key);
                 if (key.IsUnknown || resource.UnknownExpansion)

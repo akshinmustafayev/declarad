@@ -2,6 +2,7 @@ using Declarad.Cli;
 using Declarad.Directory;
 using Declarad.State;
 using Declarad.State.Backends;
+using Declarad.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Declarad.Tests

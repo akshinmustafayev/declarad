@@ -1,3 +1,8 @@
+using Declarad.Hcl.Syntax;
+using Declarad.Hcl.Values;
+using Attribute = Declarad.Hcl.Syntax.Attribute;
+using Index = Declarad.Hcl.Syntax.Index;
+
 namespace Declarad.Hcl
 {
     /// <summary>
