@@ -94,6 +94,7 @@ group "tier0_admins" {
 }
 
 password_policy "tier0" {
+  name                = "tier0"
   precedence          = 10
   min_password_length = 16
   max_password_age    = "60d"
@@ -115,12 +116,14 @@ gpo_link "baseline" {
 }
 
 service_account "svc_reports" {
+  name                                    = "svc_reports"
   description                             = "Reporting service"
   service_principal_names                 = ["HTTP/reports.corp.local"]
   principals_allowed_to_retrieve_password = [group.report_servers.dn]
 }
 
 group "report_servers" {
+  name = "report_servers"
   path = ou.corp.dn
 }
 

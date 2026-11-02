@@ -44,10 +44,17 @@ namespace Declarad.Tests
         public void AdditiveRemovalFollowsRenamesInTheSameApply()
         {
             Apply("""
-                user "a" { enabled = false }
-                user "b" { enabled = false }
+                user "a" {
+                  sam_account_name = "a"
+                  enabled = false
+                }
+                user "b" {
+                  sam_account_name = "b"
+                  enabled = false
+                }
                 group "vpn" { name = "VPN" }
                 user "c" {
+                  sam_account_name = "c"
                   enabled = false
                   groups  = [group.vpn.dn]
                 }
@@ -58,12 +65,17 @@ namespace Declarad.Tests
                 """);
             const string next = """
                 user "a" {
+                  sam_account_name = "a"
                   name    = "a-renamed"
                   enabled = false
                 }
-                user "b" { enabled = false }
+                user "b" {
+                  sam_account_name = "b"
+                  enabled = false
+                }
                 group "vpn" { name = "VPN Users" }
                 user "c" {
+                  sam_account_name = "c"
                   enabled = false
                   groups  = []
                 }
@@ -84,14 +96,17 @@ namespace Declarad.Tests
             _dir.Seed("CN=Administrator,CN=Users,DC=corp,DC=local", "user", ("sAMAccountName", "Administrator"));
             _dir.SetAttribute(DomainAdmins, "member", "CN=Administrator,CN=Users,DC=corp,DC=local");
             Apply("""
-                user "ops" { enabled = false }
+                user "ops" {
+                  sam_account_name = "ops"
+                  enabled = false
+                }
                 group_membership "da" {
                   group   = "Domain Admins"
                   members = ["Administrator", user.ops.dn]
                 }
                 """);
             Assert.Equal(2, _dir.Get(DomainAdmins)!.GetAll("member").Length);
-            Apply("user \"ops\" { enabled = false }");
+            Apply("user \"ops\" {\n  sam_account_name = \"ops\"\n  enabled = false\n}");
             Assert.Equal(new[] { "CN=Administrator,CN=Users,DC=corp,DC=local" }, _dir.Get(DomainAdmins)!.GetAll("member"));
         }
 
@@ -99,9 +114,16 @@ namespace Declarad.Tests
         public void IgnoredNameAndPathAreNotRestoredByOtherUpdates()
         {
             const string src = """
-                ou "a" { protected_from_accidental_deletion = false }
-                ou "b" { protected_from_accidental_deletion = false }
+                ou "a" {
+                  name = "a"
+                  protected_from_accidental_deletion = false
+                }
+                ou "b" {
+                  name = "b"
+                  protected_from_accidental_deletion = false
+                }
                 group "g" {
+                  name = "g"
                   path        = ou.a.dn
                   description = "one"
                   members     = []
@@ -140,7 +162,9 @@ namespace Declarad.Tests
         public void GpoLinkOrderConvergesInOneApply()
         {
             const string src = """
-                ou "o" {}
+                ou "o" {
+                  name = "o"
+                }
                 gpo_link "x1" {
                   gpo    = "{11111111-1111-1111-1111-111111111111}"
                   target = ou.o.dn
@@ -167,9 +191,18 @@ namespace Declarad.Tests
         public void GroupMembershipOnAnAuthoritativeGroupDoesNotFight()
         {
             const string src = """
-                user "a" { enabled = false }
-                user "b" { enabled = false }
-                group "g" { members = [user.a.dn] }
+                user "a" {
+                  sam_account_name = "a"
+                  enabled = false
+                }
+                user "b" {
+                  sam_account_name = "b"
+                  enabled = false
+                }
+                group "g" {
+                  name = "g"
+                  members = [user.a.dn]
+                }
                 group_membership "m" {
                   group   = group.g.dn
                   members = [user.b.dn]
@@ -225,8 +258,8 @@ namespace Declarad.Tests
         [InlineData("dns_record \"m\" {\n  zone = \"corp.local\"\n  name = \"m\"\n  type = \"MX\"\n  records = [\"10 LONGLABEL\"]\n}", "not a valid host name")]
         [InlineData("dns_record \"a\" {\n  zone = \"corp.local\"\n  name = \"a\"\n  type = \"A\"\n  records = [\"10\"]\n}", "not an IPv4 address")]
         [InlineData("dns_record \"a\" {\n  zone = \"corp.local\"\n  name = \"a\"\n  type = \"A\"\n  records = [\"10.0.0.1\"]\n  ttl = 1e20\n}", "")]
-        [InlineData("password_policy \"p\" {\n  precedence = 1\n  max_password_age = \"99999999999999999999d\"\n}", "not a valid duration")]
-        [InlineData("password_policy \"p\" {\n  precedence = 1\n  min_password_length = 7.5\n}", "must be a whole number")]
+        [InlineData("password_policy \"p\" {\n  name = \"p\"\n  precedence = 1\n  max_password_age = \"99999999999999999999d\"\n}", "not a valid duration")]
+        [InlineData("password_policy \"p\" {\n  name = \"p\"\n  precedence = 1\n  min_password_length = 7.5\n}", "must be a whole number")]
         public void RejectsInvalidValuesWithConfigurationErrors(string src, string message)
         {
             var ex = Assert.ThrowsAny<DeclaradException>(() => Load(src.Replace("LONGLABEL", new string('a', 300))));
@@ -238,8 +271,14 @@ namespace Declarad.Tests
         public void PreventDestroyBlocksReplacingAnAttachment()
         {
             const string src = """
-                ou "a" { protected_from_accidental_deletion = false }
-                ou "b" { protected_from_accidental_deletion = false }
+                ou "a" {
+                  name = "a"
+                  protected_from_accidental_deletion = false
+                }
+                ou "b" {
+                  name = "b"
+                  protected_from_accidental_deletion = false
+                }
                 gpo_link "l" {
                   gpo    = "{11111111-1111-1111-1111-111111111111}"
                   target = ou.a.dn
@@ -256,10 +295,16 @@ namespace Declarad.Tests
         public void TargetedDestroyIncludesChildrenThatOnlyExistInState()
         {
             Apply("""
-                ou "a" { protected_from_accidental_deletion = false }
-                group "g" { path = ou.a.dn }
+                ou "a" {
+                  name = "a"
+                  protected_from_accidental_deletion = false
+                }
+                group "g" {
+                  name = "g"
+                  path = ou.a.dn
+                }
                 """);
-            var config = Load("ou \"a\" { protected_from_accidental_deletion = false }");
+            var config = Load("ou \"a\" {\n  name = \"a\"\n  protected_from_accidental_deletion = false\n}");
             var plan = new Planner(_dir, config, _state, new PlanOptions { Destroy = true, Targets = new[] { "ou.a" } }).Build();
             Assert.Equal(new[] { "group.g", "ou.a" }, plan.Changes.Where(c => c.Action == ChangeAction.Delete).Select(c => c.Address));
             var result = new Applier(_dir, _state, _ => { }, NullLogger.Instance).Apply(plan);
@@ -271,9 +316,9 @@ namespace Declarad.Tests
         {
             _dir.Seed("CN=boss,CN=Users,DC=corp,DC=local", "user", ("sAMAccountName", "boss"));
             _dir.Seed("CN=emp,CN=Users,DC=corp,DC=local", "user", ("sAMAccountName", "emp"), ("manager", "CN=boss,CN=Users,DC=corp,DC=local"));
-            Apply("user \"emp\" {\n  manager = \"boss\"\n  enabled = false\n}", new PlanOptions { Adopt = true });
+            Apply("user \"emp\" {\n  sam_account_name = \"emp\"\n  manager = \"boss\"\n  enabled = false\n}", new PlanOptions { Adopt = true });
             Assert.Equal(Value.From("CN=boss,CN=Users,DC=corp,DC=local"), _state.Find("user.emp")!.Get("manager"));
-            Apply("user \"emp\" {\n  enabled = false\n}");
+            Apply("user \"emp\" {\n  sam_account_name = \"emp\"\n  enabled = false\n}");
             Assert.Null(_dir.Attr("CN=emp,CN=Users,DC=corp,DC=local", "manager"));
         }
 

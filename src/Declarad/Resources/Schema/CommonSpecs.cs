@@ -40,6 +40,13 @@ namespace Declarad.Resources.Schema
             Description = description,
         };
 
+        /// <summary>A multi-valued string attribute, authoritative when set.</summary>
+        public static AttributeSpec List(string name, string ldap, string description) => new(name, AttrType.StringList)
+        {
+            Ldap = ldap,
+            Description = description,
+        };
+
         public static AttributeSpec Country() => new("country", AttrType.String)
         {
             Ldap = "c",
@@ -55,6 +62,13 @@ namespace Declarad.Resources.Schema
             AcceptsSamAccountName = true,
             Deferred = true,
             Additive = true,
+        };
+
+        /// <summary>ADUC's "Protect object from accidental deletion"; unmanaged unless set when there is no default.</summary>
+        public static AttributeSpec Protection(bool? defaultValue) => new(ResourceType.Protected, AttrType.Bool)
+        {
+            Description = "Deny 'Delete' and 'Delete subtree' to Everyone, like the ADUC checkbox." + (defaultValue == null ? " Unmanaged unless set." : ""),
+            Default = defaultValue == null ? null : Value.From(defaultValue.Value),
         };
 
         public static AttributeSpec Bool(string name, string description, bool defaultValue) => new(name, AttrType.Bool)

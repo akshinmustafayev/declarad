@@ -6,7 +6,7 @@ State records which directory objects belong to the configuration (see [concepts
 
 ```hcl
 declarad {
-  required_version = ">= 0.3"
+  required_version = ">= 0.4"
 
   backend "s3" {
     bucket = "corp-declarad-state"

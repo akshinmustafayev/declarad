@@ -3,7 +3,7 @@
 #   declarad init --backend-config bucket=<your-bucket>
 
 declarad {
-  required_version = ">= 0.3"
+  required_version = ">= 0.4"
 
   backend "s3" {
     key    = "ad/multi-site.tfstate"

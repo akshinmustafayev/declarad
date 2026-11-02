@@ -16,7 +16,7 @@ DN: `CN=<name>,<path>`; `path` defaults to the domain root. Export skips contain
 <!-- schema:container -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label |  | Container name (the CN). Defaults to the block label. |
+| `name` | string |  | required | Container name (the CN). |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `description` | string |  | LDAP `description` | Free-text description. |
 <!-- /schema -->

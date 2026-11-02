@@ -29,6 +29,7 @@ namespace Declarad.Cli
             }
 
             user "jdoe" {
+              sam_account_name         = "jdoe"
               given_name               = "John"
               surname                  = "Doe"
               path                     = ou.staff.dn

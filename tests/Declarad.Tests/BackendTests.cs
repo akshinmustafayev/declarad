@@ -179,7 +179,7 @@ namespace Declarad.Tests
         public void InitMigratesStateBetweenBackends()
         {
             string dir = System.IO.Directory.CreateTempSubdirectory("dad-init").FullName;
-            File.WriteAllText(Path.Combine(dir, "main.dad"), ConfigTests.Connection + "group \"g\" {}\n");
+            File.WriteAllText(Path.Combine(dir, "main.dad"), ConfigTests.Connection + "group \"g\" {\n  name = \"g\"\n}\n");
             StateStore.Save(Path.Combine(dir, StateStore.DefaultFileName), SampleState());
             var commands = new Commands(NullLoggerFactory.Instance);
             var g = new GlobalOptions { Dir = dir, NoColor = true };

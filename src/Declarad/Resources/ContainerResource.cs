@@ -13,7 +13,7 @@ namespace Declarad.Resources
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
-            CommonSpecs.Name("Container name (the CN). Defaults to the block label."),
+            CommonSpecs.Name("Container name (the CN)."),
             CommonSpecs.Path(null),
             CommonSpecs.Str("description", "description", "Free-text description."),
         };

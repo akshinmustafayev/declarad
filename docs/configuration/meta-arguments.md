@@ -24,7 +24,7 @@ group "team" {
 
 Instances are addressed `user.staff["jdoe"]`. Use stable keys (sAMAccountName, not list positions): adding or removing an element then only affects that element.
 
-Inside the block, `each.key` is the key and `each.value` the element (for a set, both are the string). Without `for_each`/`count`, the label attribute (`name`, or `sam_account_name` for users) defaults to the block label. With them it doesn't, so set it explicitly.
+Inside the block, `each.key` is the key and `each.value` the element (for a set, both are the string). The object's name (`name`, or `sam_account_name` for users) is set explicitly, typically from `each.key` or `each.value`.
 
 A list of objects can't be used directly. Build a map: `{ for u in local.rows : u.sam => u }`.
 
@@ -47,7 +47,8 @@ Adds ordering that references don't imply:
 
 ```hcl
 user "svc" {
-  depends_on = [password_policy.service_accounts, module.base]
+  sam_account_name = "svc"
+  depends_on       = [password_policy.service_accounts, module.base]
 }
 ```
 
@@ -59,6 +60,7 @@ Selects which directory the object lives in. See [connections](connections.md).
 
 ```hcl
 group "eu_admins" {
+  name       = "eu_admins"
   connection = connection.eu
 }
 ```
@@ -67,6 +69,7 @@ group "eu_admins" {
 
 ```hcl
 group "domain_tier0" {
+  name = "domain_tier0"
   lifecycle {
     prevent_destroy = true            # any plan deleting it fails
     ignore_changes  = [description]   # or: ignore_changes = all

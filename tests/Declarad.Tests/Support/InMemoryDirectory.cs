@@ -114,7 +114,69 @@ namespace Declarad.Tests.Support
             }
         }
 
+        /// <summary>Deletes an object outside declarad without the Recycle Bin: it is gone for good.</summary>
         public void DeleteOutOfBand(string dn) => _entries.Remove(Find(dn)!);
+
+        /// <summary>Whether deleted objects go to the AD Recycle Bin (restorable with their attributes and memberships).</summary>
+        public bool RecycleBinEnabled { get; set; } = true;
+
+        private readonly List<(Entry Entry, List<string> Groups)> _recycleBin = new();
+
+        /// <summary>Deletes an object outside declarad, as ADUC does: it goes to the Recycle Bin.</summary>
+        public void DeleteToRecycleBin(string dn)
+        {
+            var e = Find(dn)!;
+            var groups = _entries.Where(g => g.Attrs.TryGetValue("member", out var m) && m.Any(x => Dn.AreEqual(x, dn))).Select(g => g.Dn).ToList();
+            foreach (var g in _entries)
+            {
+                if (g.Attrs.TryGetValue("member", out var members))
+                {
+                    members.RemoveAll(m => Dn.AreEqual(m, dn));
+                }
+            }
+            _entries.Remove(e);
+            e.Attrs["lastKnownParent"] = new() { Dn.Parent(dn) };
+            e.Attrs["isDeleted"] = new() { "TRUE" };
+            e.Dn = $"CN={Dn.First(dn).Value} DEL:{e.Guid},CN=Deleted Objects,{BaseDn}";
+            _recycleBin.Add((e, groups));
+        }
+
+        public DirectoryObject? GetDeletedByGuid(Guid guid, IReadOnlyCollection<string> attributes)
+        {
+            var deleted = _recycleBin.FirstOrDefault(d => d.Entry.Guid == guid).Entry;
+            return deleted == null || !RecycleBinEnabled ? null : ToObject(deleted, false);
+        }
+
+        public void Restore(string deletedDn, string newDn)
+        {
+            WriteCount++;
+            var (e, groups) = _recycleBin.FirstOrDefault(d => Dn.AreEqual(d.Entry.Dn, deletedDn));
+            if (e == null)
+            {
+                throw Fail(LdapResult.NoSuchObject, $"{deletedDn} is not in the Recycle Bin");
+            }
+            if (Find(Dn.Parent(newDn)) == null && !Dn.AreEqual(Dn.Parent(newDn), BaseDn))
+            {
+                throw Fail(LdapResult.NoSuchObject, $"parent of {newDn} does not exist");
+            }
+            if (Find(newDn) != null)
+            {
+                throw Fail(LdapResult.EntryAlreadyExists, $"{newDn} already exists");
+            }
+            _recycleBin.RemoveAll(d => d.Entry == e);
+            e.Attrs.Remove("isDeleted");
+            e.Attrs.Remove("lastKnownParent");
+            e.Dn = newDn;
+            _entries.Add(e);
+            foreach (var g in groups.Select(Find).OfType<Entry>())
+            {
+                if (!g.Attrs.TryGetValue("member", out var members))
+                {
+                    g.Attrs["member"] = members = new();
+                }
+                members.Add(newDn);
+            }
+        }
 
         public bool Exists(string dn) => Find(dn) != null;
 
@@ -297,6 +359,7 @@ namespace Declarad.Tests.Support
                         if (values.Count == 0)
                         {
                             e.Attrs.Remove(m.Attribute);
+                            e.Binary.Remove(m.Attribute);
                             break;
                         }
                         var list = e.Attrs.TryGetValue(m.Attribute, out var l) ? l : new List<string>();

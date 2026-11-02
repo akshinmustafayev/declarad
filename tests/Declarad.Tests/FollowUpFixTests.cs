@@ -45,13 +45,13 @@ namespace Declarad.Tests
         [Fact]
         public void ProtectingAnOuAlsoDeniesDeleteChildOnItsParent()
         {
-            Apply("ou \"parent\" {\n  protected_from_accidental_deletion = false\n}\nou \"child\" {\n  path = ou.parent.dn\n}\n");
+            Apply("ou \"parent\" {\n  name = \"parent\"\n  protected_from_accidental_deletion = false\n}\nou \"child\" {\n  name = \"child\"\n  path = ou.parent.dn\n}\n");
             var parent = _dir.Get("OU=parent,DC=corp,DC=local")!;
             Assert.True(SecurityDescriptor.HasDenyEveryone(parent.SecurityDescriptor, SecurityDescriptor.DeleteChild));
             Assert.False(SecurityDescriptor.IsProtectedFromDeletion(parent.SecurityDescriptor));
 
             // Lifting the child's protection keeps the parent ACE (siblings may rely on it), like ADUC.
-            Apply("ou \"parent\" {\n  protected_from_accidental_deletion = false\n}\nou \"child\" {\n  path = ou.parent.dn\n  protected_from_accidental_deletion = false\n}\n");
+            Apply("ou \"parent\" {\n  name = \"parent\"\n  protected_from_accidental_deletion = false\n}\nou \"child\" {\n  name = \"child\"\n  path = ou.parent.dn\n  protected_from_accidental_deletion = false\n}\n");
             Assert.True(SecurityDescriptor.HasDenyEveryone(_dir.Get("OU=parent,DC=corp,DC=local")!.SecurityDescriptor, SecurityDescriptor.DeleteChild));
 
             // Deny ACEs for different rights are edited independently.
@@ -71,14 +71,14 @@ namespace Declarad.Tests
         [InlineData("lockout_threshold = 70000", "between 0 and 65535")]
         public void RejectsInconsistentPasswordPolicies(string settings, string message)
         {
-            var ex = Assert.ThrowsAny<DeclaradException>(() => Load($"password_policy \"p\" {{\n  precedence = 1\n  {settings}\n}}\n"));
+            var ex = Assert.ThrowsAny<DeclaradException>(() => Load($"password_policy \"p\" {{\n  name = \"p\"\n  precedence = 1\n  {settings}\n}}\n"));
             Assert.Contains(message, ex is ConfigErrorsException c ? string.Join("\n", c.Errors.Select(e => e.Message)) : ex.Message);
         }
 
         [Fact]
         public void AcceptsConsistentPasswordPolicies()
         {
-            Assert.NotNull(Load("password_policy \"p\" {\n  precedence = 1\n  max_password_age = \"never\"\n  min_password_age = \"1d\"\n  lockout_duration = \"never\"\n  lockout_observation_window = \"1h\"\n}\n"));
+            Assert.NotNull(Load("password_policy \"p\" {\n  name = \"p\"\n  precedence = 1\n  max_password_age = \"never\"\n  min_password_age = \"1d\"\n  lockout_duration = \"never\"\n  lockout_observation_window = \"1h\"\n}\n"));
         }
 
         [Fact]
@@ -112,11 +112,12 @@ namespace Declarad.Tests
                   filter = "(objectClass=user)"
                 }
                 group "g" {
+                  name = "g"
                   description = length(data.objects.o.dns) > 0 || true ? "has members" : "empty"
                 }
                 """.Replace("data \"objects\" \"o\" {", "data \"objects\" \"o\" {"));
             Assert.NotNull(config);
-            var offline = ConfigLoader.LoadSources(".", new[] { ("main.dad", ConfigTests.Connection + "data \"domain\" \"d\" {}\ngroup \"g\" {\n  description = data.domain.d.name == \"x\" || true ? \"known\" : \"no\"\n}\n") }, new LoadOptions { GetEnv = _ => null });
+            var offline = ConfigLoader.LoadSources(".", new[] { ("main.dad", ConfigTests.Connection + "data \"domain\" \"d\" {}\ngroup \"g\" {\n  name = \"g\"\n  description = data.domain.d.name == \"x\" || true ? \"known\" : \"no\"\n}\n") }, new LoadOptions { GetEnv = _ => null });
             Assert.Equal(Value.From("known"), offline.Find("group.g")!.Get("description"));
         }
     }

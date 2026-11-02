@@ -13,7 +13,7 @@ namespace Declarad.Tests
         private static string NewProject(string extra = "")
         {
             string dir = System.IO.Directory.CreateTempSubdirectory("dad-infra").FullName;
-            File.WriteAllText(Path.Combine(dir, "main.dad"), ConfigTests.Connection + "group \"g\" {}\n" + extra);
+            File.WriteAllText(Path.Combine(dir, "main.dad"), ConfigTests.Connection + "group \"g\" {\n  name = \"g\"\n}\n" + extra);
             return dir;
         }
 

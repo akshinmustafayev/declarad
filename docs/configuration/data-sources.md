@@ -107,6 +107,7 @@ data "objects" "sales_people" {
 }
 
 group "sales_all" {
+  name    = "sales_all"
   members = data.objects.sales_people.dns
 }
 ```

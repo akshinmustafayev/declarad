@@ -60,7 +60,7 @@ namespace Declarad.Engine
                 }
             }
 
-            var upserts = plan.Changes.Where(c => c.Action is ChangeAction.Create or ChangeAction.Update or ChangeAction.NoOp or ChangeAction.Replace).ToList();
+            var upserts = plan.Changes.Where(c => c.Action is ChangeAction.Create or ChangeAction.Update or ChangeAction.Restore or ChangeAction.NoOp or ChangeAction.Replace).ToList();
             foreach (var change in upserts.Where(c => !c.IsAttachment))
             {
                 if (!Step(change, result, () => ApplyObject(Ctx(change), change, result)))
@@ -138,10 +138,23 @@ namespace Declarad.Engine
                     result.Updated++;
                     break;
 
+                case ChangeAction.Restore:
+                    _progress(change.Address, "restoring from the AD Recycle Bin...");
+                    ctx.Directory.Restore(change.Actual!.Dn, change.Desired!.Dn);
+                    Refresh(ctx, change);
+                    if (change.ImmediateChanges.Any())
+                    {
+                        type.Update(ctx, change);
+                        Refresh(ctx, change);
+                    }
+                    result.Restored++;
+                    _progress(change.Address, $"restored ({change.Actual.Dn})");
+                    break;
+
                 case ChangeAction.NoOp:
                     if (change.Adopt)
                     {
-                        _progress(change.Address, "taken under management");
+                        _progress(change.Address, change.IsAddressChange ? $"moved from {change.Prior!.Address}" : "taken under management");
                     }
                     break;
             }
@@ -235,8 +248,9 @@ namespace Declarad.Engine
                     .ToHashSet(StringComparer.Ordinal);
 
                 var added = desired.Where(d => !currentKeys.Contains(key(d))).ToList();
+                // A planned removal that phase 1 renamed into a desired item (e.g. a group whose CN changed) stays.
                 var removed = c.Spec.Additive
-                    ? currentItems.Where(x => plannedRemovals.Contains(key(x))).ToList()
+                    ? currentItems.Where(x => plannedRemovals.Contains(key(x)) && !desiredKeys.Contains(key(x))).ToList()
                     : currentItems.Where(x => !desiredKeys.Contains(key(x))).ToList();
 
                 if (added.Count == 0 && removed.Count == 0)

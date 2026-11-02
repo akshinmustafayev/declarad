@@ -3,7 +3,7 @@
 # For MinIO/Ceph/LocalStack add: endpoint = "https://minio.corp.local", use_path_style = true
 
 declarad {
-  required_version = ">= 0.3"
+  required_version = ">= 0.4"
 
   backend "s3" {
     bucket  = "corp-declarad-state"
@@ -19,5 +19,6 @@ connection {
 }
 
 group "state_demo" {
+  name        = "state_demo"
   description = "Managed with state in S3"
 }

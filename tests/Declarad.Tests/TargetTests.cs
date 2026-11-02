@@ -9,16 +9,21 @@ namespace Declarad.Tests
     {
         private const string Src = """
             ou "a" {
+              name = "a"
               protected_from_accidental_deletion = false
             }
             user "u" {
+              sam_account_name = "u"
               path    = ou.a.dn
               enabled = false
             }
             group "g" {
+              name = "g"
               members = [user.u.dn]
             }
-            group "other" {}
+            group "other" {
+              name = "other"
+            }
             """;
 
         [Fact]

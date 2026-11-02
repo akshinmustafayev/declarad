@@ -24,10 +24,19 @@ namespace Declarad.Resources
         public abstract IReadOnlyList<AttributeSpec> Schema { get; }
         public virtual string Description => "";
 
-        /// <summary>Attribute that defaults to the block label when neither for_each nor count is used.</summary>
-        public virtual string? LabelAttribute => "name";
+        /// <summary>
+        /// The attribute that names the object (a user's logon name, otherwise its name). Export labels the blocks it
+        /// generates after it. Block labels are only addresses in declarad; they are never used as values.
+        /// </summary>
+        public virtual string? NameAttribute => "name";
 
-        public virtual bool NeedsSecurityDescriptor => false;
+        /// <summary>The attribute behind ADUC's "Protect object from accidental deletion" checkbox.</summary>
+        public const string Protected = "protected_from_accidental_deletion";
+
+        /// <summary>Types with the <see cref="Protected"/> attribute manage the object's deny-delete ACE.</summary>
+        public bool SupportsProtection => Find(Protected) != null;
+
+        public virtual bool NeedsSecurityDescriptor => SupportsProtection;
 
         /// <summary>LDAP filter selecting objects of this type for export and data sources.</summary>
         public virtual string Filter => $"(objectClass={ObjectClass})";
@@ -93,6 +102,10 @@ namespace Declarad.Resources
                 result["groups"] = Value.FromStrings(obj.GetAll("memberOf"));
             }
             ReadSpecial(obj, result, directory);
+            if (SupportsProtection)
+            {
+                result[Protected] = Value.From(SecurityDescriptor.IsProtectedFromDeletion(obj.SecurityDescriptor));
+            }
             return result;
         }
 
@@ -148,7 +161,10 @@ namespace Declarad.Resources
                 : new Modification(spec.Ldap!, ModOp.Replace, ToLdap(spec, value));
 
         /// <summary>Why the object cannot be deleted as-is, or null.</summary>
-        public virtual string? CannotDeleteReason(DirectoryObject actual) => null;
+        public virtual string? CannotDeleteReason(DirectoryObject actual) =>
+            SupportsProtection && SecurityDescriptor.IsProtectedFromDeletion(actual.SecurityDescriptor)
+                ? $"it is protected from accidental deletion. Set {Protected} = false and apply before removing it."
+                : null;
 
         // ---- Apply -------------------------------------------------------------------------------
 
@@ -172,6 +188,10 @@ namespace Declarad.Resources
             ctx.Logger.LogDebug("Creating {Dn}", desired.Dn);
             ctx.Directory.Add(desired.Dn, attributes);
             AfterCreate(ctx, change);
+            if (SupportsProtection && V.Bool(desired.Get(Protected)) == true)
+            {
+                SetProtection(ctx, desired.Dn, true);
+            }
             return ReadBack(ctx, desired.Dn);
         }
 
@@ -205,6 +225,13 @@ namespace Declarad.Resources
         {
             string dn = change.CurrentDn!;
             var desired = change.Desired!;
+            // Moving an object needs the Delete right, which protection denies: lift it temporarily.
+            bool wasProtected = SupportsProtection && SecurityDescriptor.IsProtectedFromDeletion(change.Actual!.SecurityDescriptor);
+            bool movesParent = !Dn.AreEqual(Dn.Parent(dn), TargetPath(dn, desired));
+            if (movesParent && wasProtected)
+            {
+                SetProtection(ctx, dn, false);
+            }
             if (NeedsMove(dn, desired))
             {
                 string newRdn = $"{RdnType}={Dn.EscapeValue(TargetName(dn, desired))}";
@@ -225,9 +252,61 @@ namespace Declarad.Resources
                 ctx.Directory.Modify(dn, mods);
             }
             AfterUpdate(ctx, change, dn);
+            if (SupportsProtection && (change.Get(Protected) != null || (movesParent && wasProtected)))
+            {
+                SetProtection(ctx, dn, V.Bool(UpdateValues(change)(Protected)) ?? wasProtected);
+            }
+        }
+
+        protected static void SetProtection(ApplyContext ctx, string dn, bool protect)
+        {
+            var obj = ctx.Directory.GetByDn(dn, Array.Empty<string>(), withSecurityDescriptor: true)
+                ?? throw new DirectoryException($"'{dn}' not found while updating its protection.");
+            if (obj.SecurityDescriptor == null)
+            {
+                throw new DirectoryException($"Could not read the security descriptor of '{dn}'. The account needs 'Read permissions' on the object.");
+            }
+            if (SecurityDescriptor.IsProtectedFromDeletion(obj.SecurityDescriptor) != protect)
+            {
+                ctx.Directory.SetSecurityDescriptor(dn, SecurityDescriptor.SetProtectedFromDeletion(obj.SecurityDescriptor, protect));
+            }
+            if (protect)
+            {
+                ProtectParent(ctx, dn);
+            }
+        }
+
+        /// <summary>
+        /// Like ADUC, protection also denies Everyone "Delete Child" on the parent, so the object can't be removed through
+        /// the parent's rights either. That ACE is never removed again: siblings may rely on it.
+        /// </summary>
+        private static void ProtectParent(ApplyContext ctx, string dn)
+        {
+            string parentDn = Dn.Parent(dn);
+            try
+            {
+                var parent = ctx.Directory.GetByDn(parentDn, Array.Empty<string>(), withSecurityDescriptor: true);
+                if (parent?.SecurityDescriptor == null || SecurityDescriptor.HasDenyEveryone(parent.SecurityDescriptor, SecurityDescriptor.DeleteChild))
+                {
+                    return;
+                }
+                ctx.Directory.SetSecurityDescriptor(parentDn, SecurityDescriptor.SetDenyEveryone(parent.SecurityDescriptor, SecurityDescriptor.DeleteChild, true));
+            }
+            catch (DeclaradException ex)
+            {
+                // The object's own deny ACE is the protection that matters; the parent ACE is defence in depth.
+                ctx.Logger.LogWarning("Could not add the 'deny Delete Child' ACE to {Parent}: {Error}", parentDn, ex.Message);
+            }
         }
 
         protected virtual IEnumerable<Modification> SpecialModifications(ResourceChange change) => Array.Empty<Modification>();
+
+        /// <summary>
+        /// The values to apply for an update. A flag removed from the configuration is planned as a change to null
+        /// (declarad clears what it wrote), which for a flag means turning it off.
+        /// </summary>
+        protected static Func<string, Value> UpdateValues(ResourceChange change) =>
+            name => change.Get(name) is { New.IsNull: true, Spec.Type: AttrType.Bool } ? Value.False : change.Desired!.Get(name);
 
         protected virtual void AfterUpdate(ApplyContext ctx, ResourceChange change, string dn)
         {

@@ -22,6 +22,7 @@ group "lab_admins" {
 }
 
 user "alice" {
+  sam_account_name         = "alice"
   given_name               = "Alice"
   surname                  = "Example"
   path                     = ou.lab.dn

@@ -54,10 +54,11 @@ group "lab_admins" {
 }
 
 user "alice" {
-  given_name       = "Alice"
-  surname          = "Example"
-  path             = ou.lab.dn
-  initial_password = env("ALICE_PASSWORD")
+  sam_account_name         = "alice"
+  given_name               = "Alice"
+  surname                  = "Example"
+  path                     = ou.lab.dn
+  initial_password         = env("ALICE_PASSWORD")
   change_password_at_logon = true
 }
 ```

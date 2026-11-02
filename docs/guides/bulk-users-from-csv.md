@@ -65,12 +65,12 @@ Notes:
 - **Validate data** with a variable `validation` block or a resource `precondition`, e.g. that every `manager` value exists:
 
   ```hcl
-  lifecycle {
-    precondition {
-      condition     = each.value.manager == "" || contains(keys(local.people), each.value.manager)
-      error_message = "Unknown manager ${each.value.manager} for ${each.key}."
-    }
+lifecycle {
+  precondition {
+    condition     = each.value.manager == "" || contains(keys(local.people), each.value.manager)
+    error_message = "Unknown manager ${each.value.manager} for ${each.key}."
   }
-  ```
+}
+```
 
 See `examples/csv-users` and `examples/hr-sync` for complete configurations.

@@ -54,7 +54,7 @@ namespace Declarad.Resources
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
-            CommonSpecs.Name("Policy name (the CN). Defaults to the block label."),
+            CommonSpecs.Name("Policy name (the CN)."),
             CommonSpecs.Path("CN=Password Settings Container,CN=System"),
             CommonSpecs.Str("description", "description", "Free-text description."),
             new AttributeSpec("precedence", AttrType.Number)

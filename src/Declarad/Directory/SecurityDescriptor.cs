@@ -3,8 +3,9 @@ using System.Buffers.Binary;
 namespace Declarad.Directory
 {
     /// <summary>
-    /// Minimal editor for self-relative binary security descriptors. Only what "protect from accidental deletion"
-    /// needs: find, add or remove an explicit "Deny Everyone Delete + Delete Subtree" ACE in the DACL.
+    /// Minimal editor for self-relative binary security descriptors: the explicit deny ACEs behind "Protect object
+    /// from accidental deletion" and "User cannot change password", and the allow lists used by gMSA password
+    /// retrieval and resource-based constrained delegation.
     /// Written by hand because System.Security.AccessControl is Windows-only.
     /// </summary>
     public static class SecurityDescriptor
@@ -20,6 +21,16 @@ namespace Declarad.Directory
 
         // S-1-1-0 (Everyone): revision 1, one sub-authority, identifier authority 1, sub-authority 0.
         private static readonly byte[] EveryoneSid = { 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 };
+
+        // S-1-5-10 (SELF, the principal the object represents).
+        private static readonly byte[] SelfSid = { 1, 1, 0, 0, 0, 0, 0, 5, 10, 0, 0, 0 };
+
+        private const byte AccessDeniedObjectAceType = 0x06;
+        private const uint ObjectTypePresent = 0x1;
+        private const uint ControlAccess = 0x00000100;
+
+        /// <summary>The "Change Password" extended right (ab721a53-1e2f-11d0-9819-00aa0040529b).</summary>
+        private static readonly Guid ChangePasswordRight = new("ab721a53-1e2f-11d0-9819-00aa0040529b");
 
         private sealed record Ace(byte Type, byte Flags, byte[] Raw)
         {
@@ -89,6 +100,68 @@ namespace Declarad.Directory
             parsed.Dacl = result;
             parsed.Control |= DaclPresent;
             return Build(parsed);
+        }
+
+        /// <summary>
+        /// "User cannot change password" in ADUC: explicit ACEs denying Everyone and SELF the Change Password right.
+        /// </summary>
+        public static bool IsChangePasswordDenied(byte[]? sd)
+        {
+            if (sd == null || sd.Length < 20)
+            {
+                return false;
+            }
+            var dacl = Parse(sd).Dacl ?? new List<Ace>();
+            return DeniesChangePassword(dacl, EveryoneSid) && DeniesChangePassword(dacl, SelfSid);
+        }
+
+        public static byte[] SetChangePasswordDenied(byte[] sd, bool deny)
+        {
+            var parsed = Parse(sd);
+            if (parsed.Dacl == null)
+            {
+                throw new DeclaradException("The object has no DACL; refusing to add a deny ACE. Fix its permissions first.");
+            }
+            var result = parsed.Dacl.Where(a => !IsChangePasswordDeny(a, EveryoneSid) && !IsChangePasswordDeny(a, SelfSid)).ToList();
+            if (deny)
+            {
+                result.Insert(0, BuildObjectDenyAce(ControlAccess, ChangePasswordRight, SelfSid));
+                result.Insert(0, BuildObjectDenyAce(ControlAccess, ChangePasswordRight, EveryoneSid));
+            }
+            parsed.Dacl = result;
+            parsed.Control |= DaclPresent;
+            return Build(parsed);
+        }
+
+        private static bool DeniesChangePassword(List<Ace> dacl, byte[] sid) => dacl.Any(a => IsChangePasswordDeny(a, sid));
+
+        /// <summary>An explicit deny-object ACE for <paramref name="sid"/> on the Change Password right.</summary>
+        private static bool IsChangePasswordDeny(Ace ace, byte[] sid)
+        {
+            // Layout: header (4), mask (4), flags (4), object type GUID (16, when present), [inherited type GUID], SID.
+            if (ace.Type != AccessDeniedObjectAceType || (ace.Flags & InheritedAceFlag) != 0 || ace.Raw.Length < 12 + 16 + 8)
+            {
+                return false;
+            }
+            uint flags = BinaryPrimitives.ReadUInt32LittleEndian(ace.Raw.AsSpan(8));
+            if ((flags & ObjectTypePresent) == 0 || new Guid(ace.Raw.AsSpan(12, 16)) != ChangePasswordRight)
+            {
+                return false;
+            }
+            int sidOffset = 12 + 16 + ((flags & 0x2) != 0 ? 16 : 0);
+            return ace.Raw.AsSpan(sidOffset).SequenceEqual(sid);
+        }
+
+        private static Ace BuildObjectDenyAce(uint mask, Guid objectType, byte[] sid)
+        {
+            var raw = new byte[12 + 16 + sid.Length];
+            raw[0] = AccessDeniedObjectAceType;
+            BinaryPrimitives.WriteUInt16LittleEndian(raw.AsSpan(2), (ushort)raw.Length);
+            BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(4), mask);
+            BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(8), ObjectTypePresent);
+            objectType.TryWriteBytes(raw.AsSpan(12));
+            sid.CopyTo(raw, 28);
+            return new Ace(AccessDeniedObjectAceType, 0, raw);
         }
 
         private const byte AccessAllowedAceType = 0x00;

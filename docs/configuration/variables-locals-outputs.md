@@ -7,7 +7,7 @@ variable "departments" {
   description = "Departments and their people."
   type = map(object({
     manager = string
-    people  = list(object({
+    people = list(object({
       sam   = string
       admin = optional(bool, false)
     }))

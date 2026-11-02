@@ -58,7 +58,7 @@ namespace Declarad.Export
                 foreach (var obj in objects.OrderBy(o => Dn.Depth(o.Dn)).ThenBy(o => o.Dn, StringComparer.OrdinalIgnoreCase))
                 {
                     var attrs = type.Read(obj, _directory);
-                    string label = UniqueLabel(type.Name, V.Str(attrs.GetValueOrDefault(type.LabelAttribute ?? "name", Value.Null)) ?? "item", labels);
+                    string label = UniqueLabel(type.Name, V.Str(attrs.GetValueOrDefault(type.NameAttribute ?? "name", Value.Null)) ?? "item", labels);
                     items.Add(new Item(type, label, obj, attrs));
                     _refByDn[Dn.Normalize(obj.Dn)] = $"{type.Name}.{label}.dn";
                 }
@@ -106,12 +106,9 @@ namespace Declarad.Export
                     continue;
                 }
                 var value = Get(spec.Name);
-                if (spec.Name == item.Type.LabelAttribute)
+                if (spec.Name == item.Type.NameAttribute)
                 {
-                    if (V.Str(value) != item.Label)
-                    {
-                        lines.Add((spec.Name, value.ToHcl()));
-                    }
+                    lines.Add((spec.Name, value.ToHcl()));
                     continue;
                 }
                 if (spec.Name == "groups" && spec.Additive)
@@ -138,6 +135,11 @@ namespace Declarad.Export
                     continue;
                 }
 
+                // A flag without a default (e.g. smartcard_required) is unmanaged unless set; only export it when on.
+                if (spec.Type == AttrType.Bool && defaultValue.IsNull && V.Bool(value) == false)
+                {
+                    continue;
+                }
                 bool isDefault = spec.IsDn ? Dn.AreEqual(V.Str(value), V.Str(defaultValue)) : value.Equals(defaultValue);
                 if ((V.IsEmpty(value) && V.IsEmpty(defaultValue)) || isDefault)
                 {

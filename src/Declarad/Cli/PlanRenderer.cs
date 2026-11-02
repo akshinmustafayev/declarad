@@ -40,8 +40,12 @@ namespace Declarad.Cli
 
         public string Summary(Plan plan)
         {
-            int adopt = plan.Changes.Count(c => c.Adopt);
+            int adopt = plan.Changes.Count(c => c.Adopt && !c.IsAddressChange);
             string text = $"Plan: {plan.ToAdd} to add, {plan.ToChange} to change, {plan.ToDestroy} to destroy";
+            if (plan.ToRestore > 0)
+            {
+                text += $", {plan.ToRestore} to restore";
+            }
             if (adopt > 0)
             {
                 text += $", {adopt} to take under management";
@@ -51,14 +55,20 @@ namespace Declarad.Cli
 
         private void RenderChange(StringBuilder sb, ResourceChange change)
         {
+            if (change.Action == ChangeAction.NoOp && change.IsAddressChange)
+            {
+                RenderMove(sb, change);
+                return;
+            }
             var (symbol, verb, color) = change.Action switch
             {
                 ChangeAction.Create => ("+", "will be created", (Func<string, string>)_ui.Green),
+                ChangeAction.Restore => ("+", "will be restored from the AD Recycle Bin", _ui.Green),
                 ChangeAction.Update => ("~", "will be updated in-place", _ui.Yellow),
                 ChangeAction.Delete => ("-", "will be destroyed", _ui.Red),
                 ChangeAction.Forget => ("-", "will be removed from state", _ui.Dim),
                 ChangeAction.Replace => ("-/+", "must be replaced (attached to a new target)", _ui.Yellow),
-                _ when change.Adopt => ("=", change.Prior != null && change.Prior.Address != change.Address ? "has moved" : "will be taken under management", _ui.Cyan),
+                _ when change.Adopt => ("=", "will be taken under management", _ui.Cyan),
                 _ => ("=", "is unchanged", _ui.Cyan),
             };
 
@@ -90,6 +100,15 @@ namespace Declarad.Cli
                     sb.AppendLine(_ui.Dim($"      # {(change.IsAttachment ? "target" : "dn")} = {HclWriter.Quote(dn)}"));
                 }
             }
+            sb.AppendLine("    }");
+        }
+
+        /// <summary>Only the address changes (a renamed block or a moved block), shown as Terraform does.</summary>
+        private void RenderMove(StringBuilder sb, ResourceChange change)
+        {
+            sb.AppendLine($"  {_ui.Bold($"# {change.Prior!.Address} has moved to {change.Address}")}");
+            sb.AppendLine($"    {change.Address} {{");
+            sb.AppendLine(_ui.Dim($"        # {(change.IsAttachment ? "target" : "dn")} = {HclWriter.Quote(change.CurrentDn ?? change.Prior.Dn)}"));
             sb.AppendLine("    }");
         }
 

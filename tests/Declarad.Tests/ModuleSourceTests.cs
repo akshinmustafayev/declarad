@@ -56,7 +56,7 @@ namespace Declarad.Tests
             System.IO.Directory.CreateDirectory(Path.Combine(repo, "modules", "team"));
             File.WriteAllText(Path.Combine(repo, "modules", "team", "main.dad"), "variable \"name\" {}\ngroup \"team\" {\n  name = \"${var.name} v1\"\n}\nmodule \"nested\" {\n  source = \"../shared\"\n}\n");
             System.IO.Directory.CreateDirectory(Path.Combine(repo, "modules", "shared"));
-            File.WriteAllText(Path.Combine(repo, "modules", "shared", "main.dad"), "group \"shared\" {}\n");
+            File.WriteAllText(Path.Combine(repo, "modules", "shared", "main.dad"), "group \"shared\" {\n  name = \"shared\"\n}\n");
             Git(repo, "init", "--quiet");
             Git(repo, "add", ".");
             Git(repo, "commit", "--quiet", "-m", "v1");

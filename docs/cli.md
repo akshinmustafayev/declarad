@@ -75,20 +75,21 @@ Rewrites files in canonical form: two-space indentation, one space around `=`, a
 ## plan
 
 ```
-declarad plan [--adopt] [--destroy] [--target addr]... [--detailed-exitcode]
+declarad plan [--adopt] [--destroy] [--target addr]... [--detailed-exitcode] [--no-restore]
 ```
 
-Shows the changes `apply` would make. Symbols: `+` create, `~` update in place, `-` destroy, `-/+` replace (attachments only). Notes explain moved addresses, imports, adoption and objects deleted outside declarad. Outputs are shown at the end.
+Shows the changes `apply` would make. Symbols: `+` create (or restore from the AD Recycle Bin), `~` update in place, `-` destroy, `-/+` replace (attachments only). Notes explain moved addresses, imports, adoption and objects deleted outside declarad. Outputs are shown at the end.
 
 - `--adopt`: take existing objects that sit exactly where a new resource would be created under management instead of failing.
 - `--destroy`: plan the deletion of everything in state.
 - `--target`: limit the plan to these addresses and everything they depend on (for `--destroy`: everything that depends on them). Use for emergencies only; follow with a full plan.
 - `--detailed-exitcode`: exit 2 when there are changes, for drift detection in CI.
+- `--no-restore`: create managed objects that were deleted outside declarad again, instead of restoring them from the AD Recycle Bin (see [Object identity](object-identity.md#objects-deleted-outside-declarad)).
 
 ## apply
 
 ```
-declarad apply [--auto-approve] [--adopt] [--target addr]...
+declarad apply [--auto-approve] [--adopt] [--target addr]... [--no-restore]
 ```
 
 Plans, shows the plan, asks for `yes` (unless `--auto-approve`), applies, and prints outputs. In a non-interactive shell `--auto-approve` is required. If a step fails, state is saved and the error is printed; fix the cause and run `apply` again.

@@ -13,7 +13,7 @@ namespace Declarad.Resources
     public abstract class AttachmentType : ResourceType
     {
         public override string RdnType => "";
-        public override string? LabelAttribute => null;
+        public override string? NameAttribute => null;
 
         /// <summary>The attribute holding the target object's DN.</summary>
         public abstract string TargetAttribute { get; }

@@ -50,6 +50,7 @@ namespace Declarad.Tests
               members = [user.jdoe.dn, "asmith"]
             }
             user "jdoe" {
+              sam_account_name = "jdoe"
               given_name       = "John"
               surname          = "Doe"
               path             = ou.eng.dn
@@ -58,6 +59,7 @@ namespace Declarad.Tests
               groups           = ["Domain Admins"]
             }
             user "asmith" {
+              sam_account_name = "asmith"
               given_name       = "Anna"
               surname          = "Smith"
               path             = ou.eng.dn
@@ -151,9 +153,16 @@ namespace Declarad.Tests
         public void MovesProtectedOuByTemporarilyLiftingProtection()
         {
             const string src = """
-                ou "a" {}
-                ou "b" {}
-                ou "child" { path = ou.a.dn }
+                ou "a" {
+                  name = "a"
+                }
+                ou "b" {
+                  name = "b"
+                }
+                ou "child" {
+                  name = "child"
+                  path = ou.a.dn
+                }
                 """;
             Apply(src);
             string moved = src.Replace("path = ou.a.dn", "path = ou.b.dn");
@@ -168,26 +177,33 @@ namespace Declarad.Tests
         public void DeletesRemovedResourcesChildrenFirstAndRespectsProtection()
         {
             const string src = """
-                ou "a" { protected_from_accidental_deletion = false }
+                ou "a" {
+                  name = "a"
+                  protected_from_accidental_deletion = false
+                }
                 ou "b" {
+                  name = "b"
                   path = ou.a.dn
                   protected_from_accidental_deletion = false
                 }
                 user "u" {
+                  sam_account_name = "u"
                   path    = ou.b.dn
                   enabled = false
                 }
-                ou "keep" {}
+                ou "keep" {
+                  name = "keep"
+                }
                 """;
             Apply(src);
-            var plan = Plan("ou \"keep\" {}");
+            var plan = Plan("ou \"keep\" {\n  name = \"keep\"\n}");
             Assert.Equal(new[] { "user.u", "ou.b", "ou.a" }, plan.Changes.Where(c => c.Action == ChangeAction.Delete).Select(c => c.Address));
-            var result = Apply("ou \"keep\" {}");
+            var result = Apply("ou \"keep\" {\n  name = \"keep\"\n}");
             Assert.Equal(3, result.Deleted);
             Assert.False(_dir.Exists("OU=a,DC=corp,DC=local"));
 
             // A protected OU cannot be removed until protection is turned off.
-            var ex = Assert.ThrowsAny<DeclaradException>(() => Plan("ou \"other\" {}"));
+            var ex = Assert.ThrowsAny<DeclaradException>(() => Plan("ou \"other\" {\n  name = \"other\"\n}"));
             Assert.Contains("protected from accidental deletion", ex is ConfigErrorsException c ? c.Errors[0].Message : ex.Message);
         }
 
@@ -196,6 +212,7 @@ namespace Declarad.Tests
         {
             Apply("""
                 group "g" {
+                  name = "g"
                   lifecycle { prevent_destroy = true }
                 }
                 """);
@@ -208,7 +225,10 @@ namespace Declarad.Tests
         {
             _dir.Seed("CN=legacy,CN=Users,DC=corp,DC=local", "group", ("sAMAccountName", "legacy"), ("groupType", "-2147483646"), ("description", "old"));
             const string src = """
-                group "legacy" { description = "new" }
+                group "legacy" {
+                  name = "legacy"
+                  description = "new"
+                }
                 """;
             var ex = Assert.ThrowsAny<DeclaradException>(() => Plan(src));
             Assert.Contains("declarad import", ex is ConfigErrorsException c ? c.Errors[0].Message : ex.Message);
@@ -226,8 +246,12 @@ namespace Declarad.Tests
         public void RecreatesObjectsDeletedOutsideAndForgetsVanishedOnes()
         {
             const string src = """
-                group "a" {}
-                group "b" {}
+                group "a" {
+                  name = "a"
+                }
+                group "b" {
+                  name = "b"
+                }
                 """;
             Apply(src);
             _dir.DeleteOutOfBand("CN=a,CN=Users,DC=corp,DC=local");
@@ -237,9 +261,9 @@ namespace Declarad.Tests
             Assert.Contains(a.Notes, n => n.Contains("deleted outside"));
 
             _dir.DeleteOutOfBand("CN=b,CN=Users,DC=corp,DC=local");
-            plan = Plan("group \"a\" {}");
+            plan = Plan("group \"a\" {\n  name = \"a\"\n}");
             Assert.Equal(ChangeAction.Forget, plan.Changes.Single(c => c.Address == "group.b").Action);
-            Apply("group \"a\" {}");
+            Apply("group \"a\" {\n  name = \"a\"\n}");
             Assert.Null(_state.Find("group.b"));
         }
 
@@ -265,8 +289,12 @@ namespace Declarad.Tests
             _dir.Seed("CN=VPN,CN=Users,DC=corp,DC=local", "group", ("sAMAccountName", "VPN"), ("groupType", "-2147483646"));
             _dir.Seed("CN=Printers,CN=Users,DC=corp,DC=local", "group", ("sAMAccountName", "Printers"), ("groupType", "-2147483646"));
             const string src = """
-                group "team" { members = [] }
+                group "team" {
+                  name = "team"
+                  members = []
+                }
                 user "u" {
+                  sam_account_name = "u"
                   enabled = false
                   groups  = ["VPN", group.team.dn]
                 }
@@ -282,8 +310,12 @@ namespace Declarad.Tests
 
             // Dropping VPN from the list removes only the membership declarad added.
             const string fewer = """
-                group "team" { members = [] }
+                group "team" {
+                  name = "team"
+                  members = []
+                }
                 user "u" {
+                  sam_account_name = "u"
                   enabled = false
                   groups  = [group.team.dn]
                 }
@@ -302,8 +334,14 @@ namespace Declarad.Tests
         {
             _dir.Seed("CN=intruder,CN=Users,DC=corp,DC=local", "user", ("sAMAccountName", "intruder"));
             const string src = """
-                user "a" { enabled = false }
-                group "g" { members = [user.a.dn] }
+                user "a" {
+                  sam_account_name = "a"
+                  enabled = false
+                }
+                group "g" {
+                  name = "g"
+                  members = [user.a.dn]
+                }
                 """;
             Apply(src);
             _dir.SetAttribute("CN=g,CN=Users,DC=corp,DC=local", "member", "CN=intruder,CN=Users,DC=corp,DC=local");
@@ -317,22 +355,22 @@ namespace Declarad.Tests
         [Fact]
         public void ChangesGroupScopeThroughUniversal()
         {
-            Apply("group \"g\" { scope = \"global\" }");
-            Apply("group \"g\" { scope = \"domain_local\" }");
+            Apply("group \"g\" {\n  name = \"g\"\n  scope = \"global\"\n}");
+            Apply("group \"g\" {\n  name = \"g\"\n  scope = \"domain_local\"\n}");
             Assert.Equal(GroupResource.GroupType("domain_local", "security").ToString(), _dir.Attr("CN=g,CN=Users,DC=corp,DC=local", "groupType"));
-            AssertNoChanges("group \"g\" { scope = \"domain_local\" }");
+            AssertNoChanges("group \"g\" {\n  name = \"g\"\n  scope = \"domain_local\"\n}");
         }
 
         [Fact]
         public void PlanFailsForUnresolvableMembersAndUnsafeCreates()
         {
-            var ex = Assert.ThrowsAny<DeclaradException>(() => Plan("group \"g\" { members = [\"ghost\"] }"));
+            var ex = Assert.ThrowsAny<DeclaradException>(() => Plan("group \"g\" {\n  name = \"g\"\n  members = [\"ghost\"]\n}"));
             Assert.Contains("ghost", ex is ConfigErrorsException c ? c.Errors[0].Message : ex.Message);
 
-            ex = Assert.ThrowsAny<DeclaradException>(() => Plan("user \"u\" {}"));
+            ex = Assert.ThrowsAny<DeclaradException>(() => Plan("user \"u\" {\n  sam_account_name = \"u\"\n}"));
             Assert.Contains("initial_password", ex is ConfigErrorsException c2 ? c2.Errors[0].Message : ex.Message);
 
-            ex = Assert.ThrowsAny<DeclaradException>(() => Plan("user \"u\" { initial_password = \"x\" }", new PlanOptions { Encrypted = false }));
+            ex = Assert.ThrowsAny<DeclaradException>(() => Plan("user \"u\" {\n  sam_account_name = \"u\"\n  initial_password = \"x\"\n}", new PlanOptions { Encrypted = false }));
             Assert.Contains("encrypted", ex is ConfigErrorsException c3 ? c3.Errors[0].Message : ex.Message);
         }
 

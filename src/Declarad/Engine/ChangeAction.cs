@@ -10,5 +10,7 @@ namespace Declarad.Engine
         Forget,
         /// <summary>An attachment moves to a different target: detach from the old one, attach to the new one.</summary>
         Replace,
+        /// <summary>The object was deleted outside declarad and is restored from the AD Recycle Bin, keeping its SID.</summary>
+        Restore,
     }
 }
