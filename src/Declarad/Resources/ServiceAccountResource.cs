@@ -35,7 +35,7 @@ namespace Declarad.Resources
         {
             new AttributeSpec("name", AttrType.String)
             {
-                Description = "Account name (the CN). Defaults to the block label.",
+                Description = "Account name (the CN).",
                 Required = true,
                 Validate = v => V.Str(v)!.Length > 15 ? "must be at most 15 characters." : CommonSpecs.NotBlank(v),
             },

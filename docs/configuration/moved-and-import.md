@@ -27,9 +27,8 @@ Instance keys must be literals: `user.staff["jdoe"]`, `computer.ws[0]`. `from` m
 
 ### Renaming a block
 
-Renaming a block label (`user "alice"` → `user "alice2"`) never replaces the object, even without a `moved` block. The account keeps its objectGUID, SID, group memberships and every value it had:
+As in Terraform, a block label is only the resource's address in declarad. It is never used as a value: the object's name comes from `name` (and a user's logon name from `sam_account_name`), which you always set explicitly. So renaming a label (`user "alice"` → `user "alice2"`) changes nothing about the object, and declarad finds it again even without a `moved` block. The account keeps its objectGUID, SID, group memberships and every value it had:
 
-- The label is also the default for one attribute: a user's or service account's `sam_account_name`, and the `name` of other types. Other defaults follow from it (CN, UPN, display names). After a rename these keep coming from the **old** label, so `alice2` still logs on as `alice`. The state remembers the old label (`label_default`), so later plans stay clean, and renaming the block again or back works the same way.
 - Nothing is written to Active Directory: the apply only moves the entry in the state. As in Terraform, the plan shows
 
   ```
@@ -43,14 +42,10 @@ Renaming a block label (`user "alice"` → `user "alice2"`) never replaces the o
 
   If the moved resource also has changes, it is shown as `will be updated in-place` with a `# (moved from user.alice)` line. References to the new address (`user.alice2.dn`) work as usual.
 - This works for every resource type, for `for_each`/`count` blocks (`user.staff["alice"]` → `user.people["alice"]`) and for renamed `module` calls.
-- To really change the logon name or CN, set `sam_account_name` or `name` explicitly. That updates the same account in place.
-- Several blocks can be renamed in one apply. A block is matched with a removed block of the same type in the same module and connection.
+- Several blocks can be renamed in one apply.
 - Attachments (`group_membership`, `gpo_link`, `dns_record`) are recognised by their target and identity, so a rename never detaches what they attached.
-- `moved` blocks and `declarad state mv` keep label-derived values the same way.
 
-A rename is recognised only while the renamed block still describes the same object. If you rename a block **and** change what its DN is made of in the same edit (for example `given_name`/`surname`, which make up a user's CN, or `path`), the plan deletes the old object and creates a new one, and warns about it. To keep the object, rename first and change the attributes in a second apply, or add a `moved` block.
-
-Because two blocks with the same type and module are paired, removing one bare block and adding another bare block in the same edit (`user "bob" {}` → `user "carol" {}`) is treated as a rename of bob. Check the plan: it says `user.bob has moved to user.carol`. To replace bob with a new account, give the new block its own `sam_account_name`, or remove and add in separate applies.
+A renamed block may change the object in the same edit: a new `path` moves it to another OU, and a new `name` (or `given_name`/`surname`, which make up a user's CN) renames it, both in place. A renamed block is recognised as the same object when its DN, its **name (CN) or its logon name** matches an object that left the configuration. If none matches, it describes a different object: the plan deletes the old one and creates the new one, with a warning. If it really is the same object, add a `moved` block, or rename the block and the object in separate applies.
 
 `declarad state mv <from> <to>` does the same immediately, without review. Prefer `moved` blocks in shared configurations.
 

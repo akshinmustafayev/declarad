@@ -4,15 +4,16 @@ A user account.
 
 ```hcl
 user "jdoe" {
-  given_name       = "John"
-  surname          = "Doe"
-  path             = ou.staff.dn
-  title            = "Engineer"
-  department       = "Engineering"
-  email            = "john.doe@corp.example"
-  manager          = user.asmith.dn
-  groups           = ["VPN Users", group.engineering.dn]
-  initial_password = env("JDOE_INITIAL_PASSWORD")
+  sam_account_name         = "jdoe"
+  given_name               = "John"
+  surname                  = "Doe"
+  path                     = ou.staff.dn
+  title                    = "Engineer"
+  department               = "Engineering"
+  email                    = "john.doe@corp.example"
+  manager                  = user.asmith.dn
+  groups                   = ["VPN Users", group.engineering.dn]
+  initial_password         = env("JDOE_INITIAL_PASSWORD")
   change_password_at_logon = true
 
   lifecycle {
@@ -21,8 +22,7 @@ user "jdoe" {
 }
 ```
 
-DN: `CN=<name>,<path>`. Defaults:
-- `sam_account_name`: the block label.
+DN: `CN=<name>,<path>`. `sam_account_name` is required (the block label is only the resource's address in declarad). Defaults:
 - `display_name`: "given_name surname".
 - `name`: `display_name`, then `sam_account_name`.
 - `user_principal_name`: `sam@domain`.
@@ -40,7 +40,7 @@ DN: `CN=<name>,<path>`. Defaults:
 - **Exchange attributes** (`mail_nickname`, `hide_from_address_lists`, `extension_attribute_1`...`15`) and the **Unix attributes** (`uid_number`, `gid_number`, `unix_home_directory`, `login_shell`) exist only when the schema has them; leave them unset otherwise.
 - **`account_expires`** takes a date `YYYY-MM-DD` (end of that day UTC) or `"never"`.
 - **`groups` is additive**: listed groups are joined, and a membership is removed only if declarad added it earlier and you removed it from the list. Primary group membership (Domain Users) is invisible to `memberOf` and can't be managed here.
-- **Renames.** Changing `name` renames the object (the CN); `display_name` and `sam_account_name` are ordinary attributes. Renaming the **block label** keeps the account and its logon name, even when `sam_account_name` comes from the label (see [renaming a block](../configuration/moved-and-import.md#renaming-a-block)).
+- **Renames.** Changing `name` renames the object (the CN); `display_name` and `sam_account_name` are ordinary attributes, changed in place. Renaming the **block label** changes nothing in AD (see [renaming a block](../configuration/moved-and-import.md#renaming-a-block)).
 - **`manager`** is applied after all objects exist, so two users may reference each other.
 
 ## Attributes
@@ -48,7 +48,7 @@ DN: `CN=<name>,<path>`. Defaults:
 <!-- schema:user -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `sam_account_name` | string | block label | LDAP `sAMAccountName` | Logon name (pre-Windows 2000). Defaults to the block label. |
+| `sam_account_name` | string |  | required; LDAP `sAMAccountName` | Logon name (pre-Windows 2000). |
 | `name` | string | computed |  | Object name (the CN). Defaults to display_name, then sam_account_name. |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `user_principal_name` | string | computed | LDAP `userPrincipalName` | UPN. Defaults to sam_account_name@domain. |

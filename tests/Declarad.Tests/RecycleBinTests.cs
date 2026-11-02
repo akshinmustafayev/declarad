@@ -32,12 +32,15 @@ namespace Declarad.Tests
 
         private static string Config(string title = "Engineer") => $$"""
             ou "lab" {
+              name = "lab"
               protected_from_accidental_deletion = false
             }
             group "team" {
+              name = "team"
               path = ou.lab.dn
             }
             user "alice" {
+              sam_account_name = "alice"
               given_name       = "Alice"
               surname          = "Example"
               title            = "{{title}}"

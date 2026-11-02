@@ -334,7 +334,6 @@ namespace Declarad.Engine
                 Dn = change.Actual!.Dn,
                 Attributes = attributes,
                 PreventDestroy = desired.PreventDestroy,
-                LabelDefault = desired.LabelDefault,
             };
         }
     }

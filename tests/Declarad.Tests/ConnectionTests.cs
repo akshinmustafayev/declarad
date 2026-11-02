@@ -77,6 +77,7 @@ namespace Declarad.Tests
                       protected_from_accidental_deletion = false
                     }
                     group "local_admins" {
+                      name = "local_admins"
                       path = ou.office.dn
                     }
                     """,
@@ -105,7 +106,7 @@ namespace Declarad.Tests
         [Fact]
         public void ReportsUnknownConnections()
         {
-            var ex = Assert.ThrowsAny<DeclaradException>(() => Load(new() { ["main.dad"] = "group \"g\" {\n  connection = connection.apac\n}\n" }));
+            var ex = Assert.ThrowsAny<DeclaradException>(() => Load(new() { ["main.dad"] = "group \"g\" {\n  name = \"g\"\n  connection = connection.apac\n}\n" }));
             Assert.Contains("Connection 'apac' is not available", ex is ConfigErrorsException c ? c.Errors[0].Message : ex.Message);
 
             ex = Assert.ThrowsAny<DeclaradException>(() => ModuleTests.LoadTreeRaw(new()

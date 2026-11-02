@@ -19,7 +19,7 @@ namespace Declarad.Resources
         {
             new AttributeSpec("name", AttrType.String)
             {
-                Description = "Computer name (the CN). Defaults to the block label.",
+                Description = "Computer name (the CN).",
                 Required = true,
                 Validate = v => V.Str(v)!.Length > 15 ? "must be at most 15 characters (NetBIOS limit)." : CommonSpecs.NotBlank(v),
             },

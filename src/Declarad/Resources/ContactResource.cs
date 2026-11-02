@@ -14,7 +14,7 @@ namespace Declarad.Resources
         {
             new AttributeSpec("name", AttrType.String)
             {
-                Description = "Object name (the CN). Defaults to the block label.",
+                Description = "Object name (the CN).",
                 Required = true,
                 Validate = CommonSpecs.NotBlank,
             },

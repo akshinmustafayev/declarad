@@ -26,6 +26,7 @@ module "baseline_eu" {
 
 # Cross-domain: put an HQ group into an EU domain-local group by DN.
 group "eu_file_access" {
+  name       = "eu_file_access"
   connection = connection.eu
   scope      = "domain_local"
   members    = [group.hq_engineers.dn]

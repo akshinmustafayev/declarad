@@ -28,13 +28,18 @@ namespace Declarad.Tests
         public void AppliesLabelsAndDefaults()
         {
             var config = Load("""
-                ou "Sales" {}
+                ou "Sales" {
+                  name = "Sales"
+                }
                 user "jdoe" {
+                  sam_account_name = "jdoe"
                   given_name = "John"
                   surname    = "Doe"
                   path       = ou.Sales.dn
                 }
-                group "admins" {}
+                group "admins" {
+                  name = "admins"
+                }
                 """);
 
             var ou = config.Find("ou.Sales")!;
@@ -68,6 +73,7 @@ namespace Declarad.Tests
                   name = var.dept
                 }
                 user "x" {
+                  sam_account_name = "x"
                   path    = local.base
                   enabled = var.enabled
                   initial_password = "P@ssw0rd!"
@@ -92,7 +98,9 @@ namespace Declarad.Tests
                   rows  = csvdecode("sam,first,last,dept\njdoe,John,Doe,eng\nasmith,Anna,Smith,ops\n")
                   users = { for r in local.rows : r.sam => r }
                 }
-                ou "staff" {}
+                ou "staff" {
+                  name = "staff"
+                }
                 user "staff" {
                   for_each         = local.users
                   sam_account_name = each.key
@@ -103,6 +111,7 @@ namespace Declarad.Tests
                   enabled          = false
                 }
                 group "everyone" {
+                  name = "everyone"
                   path    = ou.staff.dn
                   members = [for u in user.staff : u.dn]
                 }
@@ -122,8 +131,14 @@ namespace Declarad.Tests
         public void MutualMembershipReferencesDoNotCycle()
         {
             var config = Load("""
-                group "a" { members = [group.b.dn] }
-                group "b" { members = [group.a.dn] }
+                group "a" {
+                  name = "a"
+                  members = [group.b.dn]
+                }
+                group "b" {
+                  name = "b"
+                  members = [group.a.dn]
+                }
                 """);
             Assert.Equal(2, config.Resources.Count);
         }
@@ -133,12 +148,15 @@ namespace Declarad.Tests
         {
             var errors = Errors("""
                 user "jdoe" {
+                  sam_account_name = "jdoe"
                   surnme = "Doe"
                 }
                 group "g" {
+                  name = "g"
                   scope = "planetary"
                 }
                 ou "o" {
+                  name = "o"
                   country = "Azerbaijan"
                 }
                 widget "w" {}
@@ -149,9 +167,17 @@ namespace Declarad.Tests
             Assert.Equal("main.dad", errors[0].Pos.File);
 
             errors = Errors("""
-                group "g" { scope = "planetary" }
-                ou "o" { country = "Azerbaijan" }
-                user "toolongnameforasamaccount" {}
+                group "g" {
+                  name = "g"
+                  scope = "planetary"
+                }
+                ou "o" {
+                  name = "o"
+                  country = "Azerbaijan"
+                }
+                user "toolongnameforasamaccount" {
+                  sam_account_name = "toolongnameforasamaccount"
+                }
                 """);
             Assert.Contains(errors, e => e.Message.Contains("scope must be one of"));
             Assert.Contains(errors, e => e.Message.Contains("two-letter"));
@@ -162,26 +188,43 @@ namespace Declarad.Tests
         public void DetectsDuplicatesAndBadReferences()
         {
             var errors = Errors("""
-                user "a" { name = "Same" }
-                user "b" { name = "Same" }
+                user "a" {
+                  sam_account_name = "a"
+                  name = "Same"
+                }
+                user "b" {
+                  sam_account_name = "b"
+                  name = "Same"
+                }
                 """);
             Assert.Contains(errors, e => e.Message.Contains("same distinguished name"));
 
             errors = Errors("""
-                user "dup" { name = "One" }
-                group "dup" {}
+                user "dup" {
+                  sam_account_name = "dup"
+                  name = "One"
+                }
+                group "dup" {
+                  name = "dup"
+                }
                 """);
             Assert.Contains(errors, e => e.Message.Contains("same sam_account_name"));
 
-            errors = Errors("""user "a" { path = ou.missing.dn }""");
+            errors = Errors("user \"a\" {\n  sam_account_name = \"a\"\n  path = ou.missing.dn\n}");
             Assert.Contains(errors, e => e.Message.Contains("undeclared resource ou.missing"));
 
-            errors = Errors("""user "a" { path = var.nope }""");
+            errors = Errors("user \"a\" {\n  sam_account_name = \"a\"\n  path = var.nope\n}");
             Assert.Contains(errors, e => e.Message.Contains("Undeclared variable 'nope'"));
 
             errors = Errors("""
-                ou "a" { path = ou.b.dn }
-                ou "b" { path = ou.a.dn }
+                ou "a" {
+                  name = "a"
+                  path = ou.b.dn
+                }
+                ou "b" {
+                  name = "b"
+                  path = ou.a.dn
+                }
                 """);
             Assert.Contains(errors, e => e.Message.Contains("Cycle detected"));
         }
@@ -190,8 +233,11 @@ namespace Declarad.Tests
         public void ParsesLifecycleAndDependsOn()
         {
             var config = Load("""
-                ou "a" {}
+                ou "a" {
+                  name = "a"
+                }
                 group "g" {
+                  name = "g"
                   depends_on = [ou.a]
                   lifecycle {
                     prevent_destroy = true

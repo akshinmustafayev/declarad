@@ -85,7 +85,6 @@ namespace Declarad.Cli
                     throw new DeclaradException($"{to} is already in the state.");
                 }
                 state.Remove(from);
-                string? label = LabelRenames.EffectiveLabel(resource);
                 state.Upsert(new StateResource
                 {
                     Address = to,
@@ -95,8 +94,6 @@ namespace Declarad.Cli
                     Dn = resource.Dn,
                     Attributes = resource.Attributes,
                     PreventDestroy = resource.PreventDestroy,
-                    // The object keeps the values derived from its old label (e.g. its logon name).
-                    LabelDefault = label != null && label != LabelRenames.Label(to, resource.Type) ? label : null,
                 });
                 manager.Save(state);
                 _ui.WriteLine($"Moved {from} to {to}");

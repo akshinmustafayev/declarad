@@ -4,6 +4,7 @@ A pre-staged computer account. When the machine joins the domain with the same n
 
 ```hcl
 computer "web01" {
+  name                    = "web01"
   path                    = ou.servers.dn
   description             = "Intranet web server"
   service_principal_names = ["HTTP/web01.corp.local", "HTTP/intranet.corp.local"]
@@ -30,7 +31,7 @@ DN: `CN=<name>,<path>`; `path` defaults to `CN=Computers`. `name` is limited to 
 <!-- schema:computer -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label |  | Computer name (the CN). Defaults to the block label. |
+| `name` | string |  | required | Computer name (the CN). |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `sam_account_name` | string | computed | LDAP `sAMAccountName` | Defaults to the upper-cased name followed by $. |
 | `description` | string |  | LDAP `description` | Free-text description. |

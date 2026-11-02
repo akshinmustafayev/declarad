@@ -46,6 +46,7 @@ ou "staff" {
 }
 
 user "jdoe" {
+  sam_account_name = "jdoe"
   given_name       = "John"
   surname          = "Doe"
   title            = "Lead"
@@ -89,7 +90,7 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 In Active Directory an object is not its name: it is its **objectGUID** and **SID**. Permissions, group memberships, mailboxes, profiles and Entra ID sync all point at those. An account deleted and created again with the same name is, to Windows, a *different* account. So declarad treats "delete and re-create" as the most expensive thing it can do:
 
 - **Objects are tracked by objectGUID.** Changing `name` or `path` renames or moves the same object; it is never re-created.
-- **Renaming a block changes nothing in AD.** `user "alice"` → `user "bob"` only moves the entry in declarad's state, and the account keeps its logon name.
+- **Block labels are only addresses, as in Terraform.** `user "alice"` is declarad's name for the resource, never a value: the object's name and logon name are always set with `name` / `sam_account_name`. Renaming a label only moves the entry in declarad's state; nothing changes in AD.
 - **There is no "replace" for AD objects.** If AD doesn't allow a change, the plan fails and explains why, instead of deleting and re-creating.
 - **declarad only deletes what it manages**, and only when you remove the block or run `destroy`. `prevent_destroy` and the OU deletion protection stop even that.
 - **Existing objects are never taken over silently.** Use `import`, an `import` block or `--adopt`.

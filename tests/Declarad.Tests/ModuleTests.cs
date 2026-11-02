@@ -76,7 +76,9 @@ namespace Declarad.Tests
             var config = LoadTree(new()
             {
                 ["main.dad"] = """
-                    ou "corp" {}
+                    ou "corp" {
+                      name = "corp"
+                    }
 
                     module "team" {
                       for_each = {
@@ -90,6 +92,7 @@ namespace Declarad.Tests
                     }
 
                     group "admins" {
+                      name = "admins"
                       members = flatten([for t in module.team : t.admins])
                     }
 
@@ -192,15 +195,19 @@ namespace Declarad.Tests
         public void LocalsReplayDependenciesToEveryUser()
         {
             var config = ConfigTests.Load("""
-                ou "base" {}
+                ou "base" {
+                  name = "base"
+                }
                 locals {
                   path = ou.base.dn
                 }
                 user "a" {
+                  sam_account_name = "a"
                   path    = local.path
                   enabled = false
                 }
                 user "b" {
+                  sam_account_name = "b"
                   path    = local.path
                   enabled = false
                 }
@@ -238,7 +245,9 @@ namespace Declarad.Tests
                 data "gpo" "baseline" {
                   name = "Security Baseline"
                 }
-                ou "staff" {}
+                ou "staff" {
+                  name = "staff"
+                }
                 group_membership "admins" {
                   group   = data.group.admins.dn
                   members = [user.jdoe.dn]
@@ -248,6 +257,7 @@ namespace Declarad.Tests
                   target = ou.staff.dn
                 }
                 user "jdoe" {
+                  sam_account_name = "jdoe"
                   path    = ou.staff.dn
                   enabled = false
                 }
@@ -278,6 +288,7 @@ namespace Declarad.Tests
                   filter = "(department=Sales)"
                 }
                 group "sales" {
+                  name = "sales"
                   members = data.objects.sales.dns
                 }
                 contact "c" {

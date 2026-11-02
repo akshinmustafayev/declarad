@@ -32,7 +32,7 @@ DN: `OU=<name>,<path>`. `path` defaults to the domain root.
 <!-- schema:ou -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label |  | OU name (the OU= part of the DN). Defaults to the block label. |
+| `name` | string |  | required | OU name (the OU= part of the DN). |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `description` | string |  | LDAP `description` | Free-text description. |
 | `display_name` | string |  | LDAP `displayName` | Display name. |

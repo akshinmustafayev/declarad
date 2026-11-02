@@ -20,7 +20,7 @@ namespace Declarad.Resources
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
-            CommonSpecs.Name("Group name (the CN). Defaults to the block label."),
+            CommonSpecs.Name("Group name (the CN)."),
             CommonSpecs.Path("CN=Users"),
             new AttributeSpec("sam_account_name", AttrType.String)
             {

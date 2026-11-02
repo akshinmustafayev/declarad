@@ -10,9 +10,9 @@ module "department" {
   source   = "./modules/department"
 
   # Arguments set the module's variables.
-  name    = title(each.key)
-  parent  = ou.corp.dn
-  people  = each.value.people
+  name   = title(each.key)
+  parent = ou.corp.dn
+  people = each.value.people
 }
 ```
 

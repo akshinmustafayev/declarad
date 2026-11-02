@@ -4,13 +4,13 @@ A mail contact: an address-book entry for someone outside the domain. It is not 
 
 ```hcl
 contact "vendor_support" {
-  name         = "Vendor Support"
-  given_name   = "Vendor"
-  surname      = "Support"
-  email        = "support@vendor.example"
-  company      = "Vendor Ltd"
-  path         = ou.contacts.dn
-  groups       = [group.vendors.dn]
+  name       = "Vendor Support"
+  given_name = "Vendor"
+  surname    = "Support"
+  email      = "support@vendor.example"
+  company    = "Vendor Ltd"
+  path       = ou.contacts.dn
+  groups     = [group.vendors.dn]
 }
 ```
 
@@ -21,7 +21,7 @@ DN: `CN=<name>,<path>`; `path` defaults to `CN=Users`. Contacts can be members o
 <!-- schema:contact -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label |  | Object name (the CN). Defaults to the block label. |
+| `name` | string |  | required | Object name (the CN). |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `given_name` | string |  | LDAP `givenName` | First name. |
 | `surname` | string |  | LDAP `sn` | Last name. |

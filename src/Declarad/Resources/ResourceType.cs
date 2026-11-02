@@ -24,8 +24,11 @@ namespace Declarad.Resources
         public abstract IReadOnlyList<AttributeSpec> Schema { get; }
         public virtual string Description => "";
 
-        /// <summary>Attribute that defaults to the block label when neither for_each nor count is used.</summary>
-        public virtual string? LabelAttribute => "name";
+        /// <summary>
+        /// The attribute that names the object (a user's logon name, otherwise its name). Export labels the blocks it
+        /// generates after it. Block labels are only addresses in declarad; they are never used as values.
+        /// </summary>
+        public virtual string? NameAttribute => "name";
 
         public virtual bool NeedsSecurityDescriptor => false;
 

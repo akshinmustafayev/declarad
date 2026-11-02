@@ -113,6 +113,7 @@ namespace Declarad.Tests
                   sensitive = true
                 }
                 ou "x" {
+                  name = "x"
                   description = "pw: ${var.secret}"
                 }
                 output "s" {
@@ -145,7 +146,7 @@ namespace Declarad.Tests
         [Fact]
         public void ModuleErrorsAreReportedOnceAndEvenForZeroInstances()
         {
-            const string module = "variable \"v\" {}\nuser \"u\" {\n  bogus = 1\n}\n";
+            const string module = "variable \"v\" {}\nuser \"u\" {\n  sam_account_name = \"u\"\n  bogus = 1\n}\n";
             var errors = Errors(() => ModuleTests.LoadTree(new()
             {
                 ["main.dad"] = "module \"m\" {\n  source   = \"./m\"\n  for_each = toset([\"a\", \"b\", \"c\"])\n  typo     = 1\n}\n",
@@ -216,6 +217,7 @@ namespace Declarad.Tests
                   x {}
                 }
                 group "g" {
+                  name = "g"
                   lifecycle {}
                   lifecycle {}
                 }

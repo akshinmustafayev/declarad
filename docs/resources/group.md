@@ -23,6 +23,7 @@ group "all_staff" {
 
 # Nest a group into groups declarad doesn't manage (additive).
 group "helpdesk" {
+  name   = "helpdesk"
   groups = ["Remote Desktop Users"]
 }
 ```
@@ -43,7 +44,7 @@ DN: `CN=<name>,<path>`; `path` defaults to `CN=Users`.
 <!-- schema:group -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label |  | Group name (the CN). Defaults to the block label. |
+| `name` | string |  | required | Group name (the CN). |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `sam_account_name` | string | computed | LDAP `sAMAccountName` | Pre-Windows 2000 name. Defaults to name. |
 | `description` | string |  | LDAP `description` | Free-text description. |

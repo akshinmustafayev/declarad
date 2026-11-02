@@ -42,20 +42,26 @@ namespace Declarad.Tests
         {
             const string src = """
                 container "servers" {
+                  name = "servers"
                   description = "Server accounts"
                 }
                 computer "web01" {
+                  name = "web01"
                   path                    = container.servers.dn
                   description             = "Web server"
                   service_principal_names = ["HTTP/web01.corp.local"]
                   groups                  = [group.web.dn]
                 }
                 computer "web02" {
+                  name = "web02"
                   path    = container.servers.dn
                   enabled = false
                 }
-                group "web" {}
+                group "web" {
+                  name = "web"
+                }
                 contact "vendor" {
+                  name = "vendor"
                   given_name = "Val"
                   surname    = "Vendor"
                   email      = "val@vendor.example"
@@ -73,7 +79,7 @@ namespace Declarad.Tests
             AssertConverged(src);
 
             // A computer is also a "user" object in AD, but must never be treated as a user resource.
-            const string asUser = "user \"web01\" {\n  name = \"web01\"\n  path = \"CN=servers,DC=corp,DC=local\"\n}";
+            const string asUser = "user \"web01\" {\n  sam_account_name = \"web01\"\n  name = \"web01\"\n  path = \"CN=servers,DC=corp,DC=local\"\n}";
             var ex = Assert.ThrowsAny<DeclaradException>(() => Plan(asUser, new PlanOptions { Adopt = true }));
             Assert.Contains("already managed as computer.web01", ex is ConfigErrorsException c ? c.Errors[0].Message : ex.Message);
             var saved = _state;
@@ -90,12 +96,18 @@ namespace Declarad.Tests
         public void ManagesServiceAccountsWithPasswordRetrievers()
         {
             const string src = """
-                computer "app01" {}
-                computer "app02" {}
+                computer "app01" {
+                  name = "app01"
+                }
+                computer "app02" {
+                  name = "app02"
+                }
                 group "app_servers" {
+                  name = "app_servers"
                   members = [computer.app02.dn]
                 }
                 service_account "svc_app" {
+                  name = "svc_app"
                   service_principal_names                 = ["HTTP/app.corp.local"]
                   kerberos_encryption_types               = ["aes256", "aes128"]
                   principals_allowed_to_retrieve_password = [computer.app01.dn, "app_servers"]
@@ -118,7 +130,7 @@ namespace Declarad.Tests
             Assert.Single(SecurityDescriptor.AllowedSids(_dir.Get(svc)!.Binary["msDS-GroupMSAMembership"][0]));
             AssertConverged(fewer);
 
-            var ex = Assert.ThrowsAny<DeclaradException>(() => Plan("service_account \"x\" {}", new PlanOptions { Encrypted = false }));
+            var ex = Assert.ThrowsAny<DeclaradException>(() => Plan("service_account \"x\" {\n  name = \"x\"\n}", new PlanOptions { Encrypted = false }));
             Assert.Contains("encrypted", ex is ConfigErrorsException c ? c.Errors[0].Message : ex.Message);
         }
 
@@ -126,8 +138,11 @@ namespace Declarad.Tests
         public void ManagesFineGrainedPasswordPolicies()
         {
             const string src = """
-                group "admins" {}
+                group "admins" {
+                  name = "admins"
+                }
                 password_policy "admins" {
+                  name = "admins"
                   precedence          = 10
                   min_password_length = 15
                   max_password_age    = "1008h"
@@ -162,8 +177,14 @@ namespace Declarad.Tests
             _dir.SetAttribute(admins, "member", "CN=existing,CN=Users,DC=corp,DC=local");
 
             const string src = """
-                user "a" { enabled = false }
-                user "b" { enabled = false }
+                user "a" {
+                  sam_account_name = "a"
+                  enabled = false
+                }
+                user "b" {
+                  sam_account_name = "b"
+                  enabled = false
+                }
                 group_membership "admins" {
                   group   = "Domain Admins"
                   members = [user.a.dn, user.b.dn]
@@ -181,7 +202,7 @@ namespace Declarad.Tests
             Assert.Equal(2, _dir.Get(admins)!.GetAll("member").Length);
 
             // Removing the resource detaches only what it added; the pre-existing member stays.
-            Apply("user \"a\" { enabled = false }\nuser \"b\" { enabled = false }");
+            Apply("user \"a\" {\n  sam_account_name = \"a\"\n  enabled = false\n}\nuser \"b\" {\n  sam_account_name = \"b\"\n  enabled = false\n}");
             Assert.Equal(new[] { "CN=existing,CN=Users,DC=corp,DC=local" }, _dir.Get(admins)!.GetAll("member"));
             Assert.Null(_state.Find("group_membership.admins"));
         }
@@ -197,6 +218,7 @@ namespace Declarad.Tests
                   name = "Security Baseline"
                 }
                 ou "staff" {
+                  name = "staff"
                   block_inheritance = true
                 }
                 gpo_link "default" {
@@ -226,7 +248,7 @@ namespace Declarad.Tests
             AssertConverged(src);
 
             // Moving the link to another OU detaches it from the first.
-            string moved = src.Replace("ou \"staff\" {", "ou \"other\" {}\nou \"staff\" {").Replace("target   = ou.staff.dn", "target   = ou.other.dn");
+            string moved = src.Replace("ou \"staff\" {", "ou \"other\" {\n  name = \"other\"\n}\nou \"staff\" {").Replace("target   = ou.staff.dn", "target   = ou.other.dn");
             var replace = Plan(moved).Changes.Single(c => c.Address == "gpo_link.baseline");
             Assert.Equal(ChangeAction.Replace, replace.Action);
             Apply(moved);
@@ -256,7 +278,10 @@ namespace Declarad.Tests
 
             _dir.Seed("CN=legacy,CN=Users,DC=corp,DC=local", "group", ("sAMAccountName", "legacy"), ("groupType", "-2147483646"));
             const string imported = """
-                group "legacy" { description = "now managed" }
+                group "legacy" {
+                  name = "legacy"
+                  description = "now managed"
+                }
                 import {
                   to = group.legacy
                   id = "CN=legacy,CN=Users,DC=corp,DC=local"
@@ -316,7 +341,7 @@ namespace Declarad.Tests
         [Fact]
         public void TargetLimitsThePlan()
         {
-            var plan = Plan("group \"a\" {}\ngroup \"b\" {}", new PlanOptions { Targets = new[] { "group.a" } });
+            var plan = Plan("group \"a\" {\n  name = \"a\"\n}\ngroup \"b\" {\n  name = \"b\"\n}", new PlanOptions { Targets = new[] { "group.a" } });
             Assert.Equal("group.a", Assert.Single(plan.Changes).Address);
         }
 
@@ -327,11 +352,15 @@ namespace Declarad.Tests
                 data "gpo" "baseline" {
                   name = "Security Baseline"
                 }
-                ou "srv" {}
+                ou "srv" {
+                  name = "srv"
+                }
                 computer "web01" {
+                  name = "web01"
                   path = ou.srv.dn
                 }
                 contact "vendor" {
+                  name = "vendor"
                   email = "v@example.com"
                 }
                 gpo_link "srv" {
@@ -340,6 +369,7 @@ namespace Declarad.Tests
                   enforced = true
                 }
                 password_policy "strict" {
+                  name = "strict"
                   precedence = 1
                 }
                 """);

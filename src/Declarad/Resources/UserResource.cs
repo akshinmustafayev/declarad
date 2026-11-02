@@ -15,7 +15,7 @@ namespace Declarad.Resources
         public override string ObjectClass => "user";
         public override string RdnType => "CN";
         public override string Description => "User account";
-        public override string? LabelAttribute => "sam_account_name";
+        public override string? NameAttribute => "sam_account_name";
         public override string Filter => "(&(objectCategory=person)(objectClass=user))";
         protected override IEnumerable<string> ExtraLdapAttributes => new[] { "userAccountControl", "accountExpires", "userWorkstations" };
 
@@ -37,7 +37,7 @@ namespace Declarad.Resources
             new AttributeSpec("sam_account_name", AttrType.String)
             {
                 Ldap = "sAMAccountName",
-                Description = "Logon name (pre-Windows 2000). Defaults to the block label.",
+                Description = "Logon name (pre-Windows 2000).",
                 Required = true,
                 Validate = v => ValidateSam(v, 20),
             },

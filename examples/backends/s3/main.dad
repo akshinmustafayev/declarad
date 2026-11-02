@@ -19,5 +19,6 @@ connection {
 }
 
 group "state_demo" {
+  name        = "state_demo"
   description = "Managed with state in S3"
 }

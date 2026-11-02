@@ -18,7 +18,7 @@ namespace Declarad.Resources
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
-            CommonSpecs.Name("OU name (the OU= part of the DN). Defaults to the block label."),
+            CommonSpecs.Name("OU name (the OU= part of the DN)."),
             CommonSpecs.Path(null),
             CommonSpecs.Str("description", "description", "Free-text description."),
             CommonSpecs.Str("display_name", "displayName", "Display name."),

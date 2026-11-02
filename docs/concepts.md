@@ -22,7 +22,7 @@ user "staff" { for_each = ... }                   # user.staff["jdoe"], user.sta
 module "eng" { source = "./modules/dept" }        # module.eng.user.person["jdoe"]
 ```
 
-The **address** identifies the resource in plans, in state and on the command line (`--target`, `import`, `state rm`).
+The **address** identifies the resource in plans, in state and on the command line (`--target`, `import`, `state rm`). As in Terraform, the label is only that address: it is never used as a value. The object's own name is always set with `name` (and a user's logon name with `sam_account_name`), so renaming a label never changes anything in AD.
 
 ### Distinguished names are computed
 
@@ -46,7 +46,7 @@ Objects in the directory that are not in state are **not managed**: declarad nev
 For every resource in the configuration:
 
 - **In state** → read the object by GUID and diff. If the object vanished, it is restored from the AD Recycle Bin when possible, otherwise created again (see [Object identity](object-identity.md)).
-- **Not in state** → an `import` block or a `moved` block may connect it to an existing object; a renamed block label is detected automatically and keeps the object and its label-derived values (see [renaming a block](configuration/moved-and-import.md#renaming-a-block)); otherwise, if an object already exists at the DN, the plan fails and tells you to import it (or to run with `--adopt`).
+- **Not in state** → an `import` block or a `moved` block may connect it to an existing object; a renamed block label is detected automatically and only moves the state entry (see [renaming a block](configuration/moved-and-import.md#renaming-a-block)); otherwise, if an object already exists at the DN, the plan fails and tells you to import it (or to run with `--adopt`).
 
 Every address in state that is no longer in the configuration is planned for deletion (unless `prevent_destroy` or OU protection forbids it).
 

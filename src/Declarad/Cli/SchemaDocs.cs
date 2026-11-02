@@ -15,7 +15,7 @@ namespace Declarad.Cli
             sb.AppendLine("|---|---|---|---|---|");
             foreach (var spec in type.Schema)
             {
-                sb.AppendLine(Row(spec, type.LabelAttribute == spec.Name));
+                sb.AppendLine(Row(spec));
             }
             return sb.ToString();
         }
@@ -27,24 +27,23 @@ namespace Declarad.Cli
             sb.AppendLine("|---|---|---|---|---|");
             foreach (var spec in data.Arguments)
             {
-                sb.AppendLine(Row(spec, false));
+                sb.AppendLine(Row(spec));
             }
             return sb.ToString();
         }
 
-        private static string Row(AttributeSpec spec, bool isLabel)
+        private static string Row(AttributeSpec spec)
         {
             string type = spec.Type switch
             {
                 AttrType.StringList => "list(string)",
                 _ => spec.Type.ToString().ToLowerInvariant(),
             };
-            string defaultText = isLabel ? "block label"
-                : spec.Default != null ? $"`{spec.Default.ToHcl()}`"
+            string defaultText = spec.Default != null ? $"`{spec.Default.ToHcl()}`"
                 : spec.DefaultFunc != null ? "computed"
                 : "";
             var notes = new List<string>();
-            if (spec.Required && !isLabel)
+            if (spec.Required)
             {
                 notes.Add("required");
             }

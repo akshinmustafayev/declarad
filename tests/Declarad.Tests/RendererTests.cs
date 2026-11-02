@@ -15,12 +15,15 @@ namespace Declarad.Tests
             const string v1 = """
                 ou "staff" { name = "Staff" }
                 user "jdoe" {
+                  sam_account_name = "jdoe"
                   path             = ou.staff.dn
                   title            = "Engineer"
                   initial_password = "s3cret!"
                   groups           = ["Domain Admins"]
                 }
-                group "old" {}
+                group "old" {
+                  name = "old"
+                }
                 """;
             var plan = new Planner(dir, ConfigTests.Load(v1), state, new PlanOptions()).Build();
             var ui = new Declarad.Cli.ConsoleUi { Color = false };
@@ -35,6 +38,7 @@ namespace Declarad.Tests
             const string v2 = """
                 ou "staff" { name = "Staff" }
                 user "jdoe" {
+                  sam_account_name = "jdoe"
                   path   = ou.staff.dn
                   title  = "Lead"
                   groups = []

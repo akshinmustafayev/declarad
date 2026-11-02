@@ -219,7 +219,6 @@ namespace Declarad.Cli
                 var config = LoadConfig(g, online: true);
                 var manager = OpenState(g, config.Settings);
                 var state = manager.Load();
-                config = LabelRenames.Resolve(config, state, labels => LoadConfig(g, online: true, labels));
                 using var pool = NewPool(config);
                 var plan = BuildPlan(config, state, pool, adopt, destroy, target, restore: !noRestore);
                 var renderer = new PlanRenderer(_ui);
@@ -522,7 +521,6 @@ namespace Declarad.Cli
             var manager = OpenState(g, config.Settings);
             using var stateLock = LockState(g, manager, destroy ? "destroy" : "apply");
             var state = manager.Load();
-            config = LabelRenames.Resolve(config, state, labels => LoadConfig(g, online: true, labels));
             using var pool = NewPool(config);
             var plan = BuildPlan(config, state, pool, adopt, destroy, targets, restore);
             var renderer = new PlanRenderer(_ui);
@@ -619,7 +617,7 @@ namespace Declarad.Cli
             return plan;
         }
 
-        private Configuration LoadConfig(GlobalOptions g, bool online, IReadOnlyDictionary<string, string>? labelDefaults = null)
+        private Configuration LoadConfig(GlobalOptions g, bool online)
         {
             var vars = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (string v in g.Vars)
@@ -636,7 +634,6 @@ namespace Declarad.Cli
                 Vars = vars,
                 Connect = online ? ConnectDirectory : null,
                 Prompt = Prompt,
-                LabelDefaults = labelDefaults,
             });
         }
 

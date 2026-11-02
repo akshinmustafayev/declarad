@@ -39,7 +39,7 @@ The scope and the name can't be changed after creation.
 <!-- schema:dns_zone -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label | immutable | Zone name, e.g. corp.example or 10.in-addr.arpa. Defaults to the block label. |
+| `name` | string |  | required; immutable | Zone name, e.g. corp.example or 10.in-addr.arpa. |
 | `replication_scope` | string | `"domain"` | immutable; one of `domain`, `forest`, `legacy` | domain (DomainDnsZones), forest (ForestDnsZones) or legacy (domain partition). |
 | `path` | string | computed | immutable; DN | Container of the zone; derived from replication_scope. |
 | `dynamic_update` | string | `"secure"` | one of `none`, `secure`, `nonsecure_and_secure` | none, secure or nonsecure_and_secure. |

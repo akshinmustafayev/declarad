@@ -64,9 +64,9 @@ The block label is declarad's name for a resource, not the object's name in AD. 
 Plan: 0 to add, 0 to change, 0 to destroy.
 ```
 
-When the label is also the default value of an attribute (a user's `sam_account_name`, the `name` of most other types), the object keeps the value it got from the **old** label. `bob` still logs on as `alice`. To change the logon name, set `sam_account_name` explicitly; that updates the same account.
+The label is never used as a value: the object's name and logon name are always set explicitly with `name` and `sam_account_name`. Changing those is an in-place rename of the same object.
 
-A rename is recognised only while the renamed block still describes the same object. If you rename a block **and** change what its DN is made of (for example `surname`, which is part of a user's CN, or `path`) in the same edit, the plan shows a delete and a create, with a warning. Rename first and change the attributes in a second apply, or use a `moved` block.
+You can rename a block and change the object in the same edit. A new `path` moves the object to the other OU, and a new `name` renames it, both in place with the same SID and GUID. A renamed block is recognised as the same object when its DN, **its name (CN) or its logon name** matches an object that left the configuration. Only when none matches (which is what replacing one account with another looks like) does the plan show a delete and a create, with a warning. If it really is the same object, add a `moved` block, or rename the block and the object in separate applies.
 
 ## Deletion safeguards
 
@@ -107,7 +107,7 @@ Before typing `yes`, look for these:
 |---|---|---|
 | `- ... will be destroyed` | An object will be deleted | Did you really remove that block? |
 | `+ ... will be created` with a note *new object with a new SID* | A managed object disappeared and will come back as a new identity | Can you restore it from the Recycle Bin or a backup instead? |
-| A `-` and a `+` of the same type in one plan | Possibly a rename that changed the DN as well | Do the rename and the attribute change separately, or use a `moved` block |
+| A `-` and a `+` of the same type in one plan, with a warning | A renamed block whose name and logon name both changed, so declarad treats it as a different object | If it is the same object, add a `moved` block |
 | `will be taken under management` | An existing object is adopted | Is it the object you meant? |
 
 In CI, run `declarad plan --detailed-exitcode` and require a human review whenever the plan contains destroys.

@@ -30,7 +30,7 @@ namespace Declarad.Resources.Dns
         {
             new AttributeSpec("name", AttrType.String)
             {
-                Description = "Zone name, e.g. corp.example or 10.in-addr.arpa. Defaults to the block label.",
+                Description = "Zone name, e.g. corp.example or 10.in-addr.arpa.",
                 Required = true,
                 Immutable = true,
                 Normalize = v => Value.From(DnsCodec.NormalizeZone(V.Str(v)!)),

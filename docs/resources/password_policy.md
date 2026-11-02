@@ -3,18 +3,21 @@
 A fine-grained password policy (Password Settings Object). It applies to the users and global security groups in `applies_to`, overriding the domain policy for them.
 
 ```hcl
-group "tier0_admins" {}
+group "tier0_admins" {
+  name = "tier0_admins"
+}
 
 password_policy "tier0" {
-  precedence             = 10
-  min_password_length    = 16
-  password_history_count = 24
-  max_password_age       = "60d"
-  min_password_age       = "1d"
-  lockout_threshold      = 5
-  lockout_duration       = "never"        # until an admin unlocks
+  name                       = "tier0"
+  precedence                 = 10
+  min_password_length        = 16
+  password_history_count     = 24
+  max_password_age           = "60d"
+  min_password_age           = "1d"
+  lockout_threshold          = 5
+  lockout_duration           = "never"        # until an admin unlocks
   lockout_observation_window = "30m"
-  applies_to             = [group.tier0_admins.dn]
+  applies_to                 = [group.tier0_admins.dn]
 }
 ```
 
@@ -39,7 +42,7 @@ DN: `CN=<name>,CN=Password Settings Container,CN=System,<domain>`.
 <!-- schema:password_policy -->
 | Attribute | Type | Default | Notes | Description |
 |---|---|---|---|---|
-| `name` | string | block label |  | Policy name (the CN). Defaults to the block label. |
+| `name` | string |  | required | Policy name (the CN). |
 | `path` | string | computed | DN | Distinguished name of the parent OU or container. |
 | `description` | string |  | LDAP `description` | Free-text description. |
 | `precedence` | number |  | required; LDAP `msDS-PasswordSettingsPrecedence` | Lower numbers win when several policies apply. |

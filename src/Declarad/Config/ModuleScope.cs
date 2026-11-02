@@ -996,7 +996,9 @@ namespace Declarad.Config
                     {
                         if (spec.Required)
                         {
-                            _l.Error($"{result.Address}: attribute '{spec.Name}' is required.", pos);
+                            // Block labels are only addresses (as in Terraform), so the object's name must be set explicitly.
+                            string hint = spec.Name == result.Type.NameAttribute ? $" The block label is only the resource's address in declarad; set {spec.Name} explicitly." : "";
+                            _l.Error($"{result.Address}: attribute '{spec.Name}' is required.{hint}", pos);
                         }
                         continue;
                     }
@@ -1178,12 +1180,6 @@ namespace Declarad.Config
                     {
                         value = spec.Normalize(value);
                     }
-                }
-                if (value.IsNull && name == type.LabelAttribute && !inst.Block.IsExpanded)
-                {
-                    string label = _l.Options.LabelDefaults?.GetValueOrDefault(inst.Result.Address) ?? inst.Block.Label;
-                    inst.Result.LabelDefault = label == inst.Block.Label ? null : label;
-                    value = Value.From(label);
                 }
                 if (value.IsNull)
                 {

@@ -33,6 +33,7 @@ namespace Declarad.Tests
 
         private const string Full = """
             user "jroe" {
+              sam_account_name = "jroe"
               given_name              = "Jane"
               surname                 = "Roe"
               middle_name             = "Q"
@@ -88,6 +89,7 @@ namespace Declarad.Tests
             Apply(Full);
             const string changed = """
                 user "jroe" {
+                  sam_account_name = "jroe"
                   given_name           = "Jane"
                   surname              = "Roe"
                   enabled              = false
@@ -117,6 +119,7 @@ namespace Declarad.Tests
         {
             Apply("""
                 user "jroe" {
+                  sam_account_name = "jroe"
                   given_name = "Jane"
                   surname    = "Roe"
                   enabled    = false
@@ -127,6 +130,7 @@ namespace Declarad.Tests
 
             AssertConverged("""
                 user "jroe" {
+                  sam_account_name = "jroe"
                   given_name = "Jane"
                   surname    = "Roe"
                   enabled    = false
@@ -151,6 +155,7 @@ namespace Declarad.Tests
         {
             var ex = Assert.ThrowsAny<DeclaradException>(() => Load("""
                 user "jroe" {
+                  sam_account_name = "jroe"
                   enabled            = false
                   logon_workstations = ["WS01,WS02"]
                 }

@@ -365,10 +365,13 @@ namespace Declarad.Engine
             return match;
         }
 
-        /// <summary>The same object: the same DN, or the same logon name for types that have one.</summary>
+        /// <summary>
+        /// The same object: the same DN, the same name (moved to another container), or the same logon name for types
+        /// that have one (renamed).
+        /// </summary>
         private static bool SameObject(StateResource prior, ResourceInstance r)
         {
-            if (Dn.AreEqual(prior.Dn, r.Dn))
+            if (Dn.AreEqual(prior.Dn, r.Dn) || string.Equals(Dn.First(prior.Dn).Value, V.Str(r.Get("name")), StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -522,8 +525,8 @@ namespace Declarad.Engine
         }
 
         /// <summary>
-        /// A renamed block keeps its object (see <see cref="LabelRenames"/>) unless it also changed what makes up the DN;
-        /// then it describes a different object, which plans a delete and a create. Say how to keep the object.
+        /// A renamed block keeps its object unless its name and logon name both changed; then it describes a different
+        /// object, which plans a delete and a create. Say how to keep the object.
         /// </summary>
         private static void WarnAboutReplacedLabels(List<ResourceChange> upserts, List<ResourceChange> deletes, Plan plan)
         {
@@ -533,9 +536,9 @@ namespace Declarad.Engine
                     && c.Type.Name == delete.Type.Name && c.Desired!.Connection == delete.Prior!.Connection);
                 if (created != null)
                 {
-                    plan.Warnings.Add($"{delete.Address} will be deleted and {created.Address} created as a new object (with a new SID). " +
-                        "If you renamed the block, its name or path changed as well, so it no longer describes the same object. To keep the " +
-                        $"existing object, rename the block and change its attributes in separate applies, or add a moved block with from = {delete.Address} and to = {created.Address}.");
+                    plan.Warnings.Add($"{delete.Address} will be deleted and {created.Address} created as a new object (with a new SID), " +
+                        "because its name and logon name both differ. If they are the same object (a renamed block whose name changed too), " +
+                        $"keep it with a moved block with from = {delete.Address} and to = {created.Address}, or rename the block and the object in separate applies.");
                 }
             }
         }
