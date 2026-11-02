@@ -12,6 +12,17 @@ namespace Declarad.Resources
     public sealed class ServiceAccountResource : ResourceType
     {
         private const string MembershipAttribute = "msDS-GroupMSAMembership";
+        private const string ActOnBehalfAttribute = "msDS-AllowedToActOnBehalfOfOtherIdentity";
+
+        /// <summary>Principal lists stored as security descriptors: attribute name → LDAP attribute.</summary>
+        private static readonly Dictionary<string, string> PrincipalLists = new(StringComparer.Ordinal)
+        {
+            ["principals_allowed_to_retrieve_password"] = MembershipAttribute,
+            ["principals_allowed_to_delegate_to_account"] = ActOnBehalfAttribute,
+        };
+
+        private static readonly (string Name, long Flag, string Description)[] AccountOptions =
+            Uac.OptionsNamed("trusted_for_delegation", "trusted_to_auth_for_delegation", "account_is_sensitive");
         private const string BuiltinAdministrators = "S-1-5-32-544";
         private const uint FullControl = 0x000F01FF;
 
@@ -29,7 +40,7 @@ namespace Declarad.Resources
         public override string RdnType => "CN";
         public override string Description => "Group managed service account (gMSA)";
         public override string Filter => "(objectClass=msDS-GroupManagedServiceAccount)";
-        protected override IEnumerable<string> ExtraLdapAttributes => new[] { "userAccountControl", "msDS-SupportedEncryptionTypes", MembershipAttribute };
+        protected override IEnumerable<string> ExtraLdapAttributes => new[] { "userAccountControl", "msDS-SupportedEncryptionTypes", MembershipAttribute, ActOnBehalfAttribute };
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
@@ -54,6 +65,9 @@ namespace Declarad.Resources
                 DefaultFunc = (get, ctx) => get("name").IsUnknown ? Value.Unknown : Value.From($"{V.Str(get("name"))!.ToLowerInvariant()}.{ctx.Domain}"),
             },
             CommonSpecs.Str("description", "description", "Free-text description."),
+            CommonSpecs.Str("display_name", "displayName", "Display name."),
+            CommonSpecs.Str("notes", "info", "Notes."),
+            CommonSpecs.DnLink("managed_by", "managedBy", "DN or sAMAccountName of the user or group that manages the account."),
             new AttributeSpec("service_principal_names", AttrType.StringList)
             {
                 Ldap = "servicePrincipalName",
@@ -81,9 +95,20 @@ namespace Declarad.Resources
                 AcceptsSamAccountName = true,
                 Deferred = true,
             },
+            CommonSpecs.List("allowed_to_delegate_to", "msDS-AllowedToDelegateTo", "Kerberos constrained delegation: SPNs of the services this account may delegate to. Authoritative when set."),
+            new AttributeSpec("principals_allowed_to_delegate_to_account", AttrType.StringList)
+            {
+                Description = "Resource-based constrained delegation: accounts (DN or sAMAccountName) allowed to delegate to this account's services. Authoritative when set; [] clears it.",
+                IsDn = true,
+                AcceptsSamAccountName = true,
+                Deferred = true,
+            },
             CommonSpecs.Bool("enabled", "Whether the account is enabled.", true),
-            CommonSpecs.Groups(),
-        };
+            CommonSpecs.Protection(null),
+        }
+        .Concat(Uac.OptionSpecs(AccountOptions))
+        .Append(CommonSpecs.Groups())
+        .ToArray();
 
         public override IEnumerable<string> ValidateCreate(Config.ResourceInstance desired, bool encryptedConnection)
         {
@@ -97,14 +122,18 @@ namespace Declarad.Resources
         {
             long uac = obj.GetLong("userAccountControl") ?? Uac.WorkstationTrust;
             result["enabled"] = Value.From((uac & Uac.AccountDisable) == 0);
+            Uac.ReadOptions(uac, AccountOptions, result);
             long types = obj.GetLong("msDS-SupportedEncryptionTypes") ?? 0;
             result["kerberos_encryption_types"] = Value.FromStrings(EncryptionTypes.Where(e => (types & e.Value) != 0).Select(e => e.Key).Order(StringComparer.Ordinal));
 
-            var sd = obj.Binary.TryGetValue(MembershipAttribute, out var values) && values.Length > 0 ? values[0] : null;
-            var principals = SecurityDescriptor.AllowedSids(sd)
-                .Select(sid => directory.GetByDn($"<SID={sid}>", Array.Empty<string>())?.Dn ?? sid)
-                .ToList();
-            result["principals_allowed_to_retrieve_password"] = Value.FromStrings(principals);
+            foreach (var (name, attribute) in PrincipalLists)
+            {
+                var sd = obj.Binary.TryGetValue(attribute, out var values) && values.Length > 0 ? values[0] : null;
+                var principals = SecurityDescriptor.AllowedSids(sd)
+                    .Select(sid => directory.GetByDn($"<SID={sid}>", Array.Empty<string>())?.Dn ?? sid)
+                    .ToList();
+                result[name] = Value.FromStrings(principals);
+            }
         }
 
         private static string EncryptionFlags(Value types) =>
@@ -112,7 +141,7 @@ namespace Declarad.Resources
 
         protected override void AddCreateAttributes(Config.ResourceInstance desired, Dictionary<string, object[]> attributes)
         {
-            attributes["userAccountControl"] = new object[] { Uac.WithEnabled(Uac.WorkstationTrust, desired.Get("enabled")).ToString() };
+            attributes["userAccountControl"] = new object[] { Uac.WithOptions(Uac.WithEnabled(Uac.WorkstationTrust, desired.Get("enabled")), AccountOptions, desired.Get).ToString() };
             attributes["msDS-SupportedEncryptionTypes"] = new object[] { EncryptionFlags(desired.Get("kerberos_encryption_types")) };
             // A gMSA must always carry a membership descriptor, even an empty one.
             attributes[MembershipAttribute] = new object[] { SecurityDescriptor.BuildAllowList(BuiltinAdministrators, Array.Empty<string>(), FullControl) };
@@ -120,10 +149,11 @@ namespace Declarad.Resources
 
         protected override IEnumerable<Modification> SpecialModifications(ResourceChange change)
         {
-            if (change.Get("enabled") != null)
+            if (change.Get("enabled") != null || AccountOptions.Any(o => change.Get(o.Name) != null))
             {
                 long current = change.Actual!.GetLong("userAccountControl") ?? Uac.WorkstationTrust;
-                yield return Modification.Replace("userAccountControl", Uac.WithEnabled(current, change.Desired!.Get("enabled")).ToString());
+                long uac = Uac.WithOptions(Uac.WithEnabled(current, change.Desired!.Get("enabled")), AccountOptions, UpdateValues(change));
+                yield return Modification.Replace("userAccountControl", uac.ToString());
             }
             if (change.Get("kerberos_encryption_types") != null)
             {
@@ -134,16 +164,23 @@ namespace Declarad.Resources
         public override void ApplyDeferred(ApplyContext ctx, ResourceChange change)
         {
             base.ApplyDeferred(ctx, change);
-            if (change.Get("principals_allowed_to_retrieve_password") == null)
+            foreach (var (name, attribute) in PrincipalLists)
             {
-                return;
+                if (change.Get(name) == null)
+                {
+                    continue;
+                }
+                var sids = V.List(change.Desired!.Get(name))
+                    .Select(dn => ctx.Directory.GetByDn(dn, Array.Empty<string>())?.Sid
+                        ?? throw new DirectoryException($"Cannot resolve the SID of '{dn}'."))
+                    .ToList();
+                string dn = change.CurrentDn ?? change.TargetDn!;
+                // A gMSA always carries a membership descriptor; an empty delegation list removes the attribute.
+                var mod = sids.Count == 0 && attribute == ActOnBehalfAttribute
+                    ? Modification.Clear(attribute)
+                    : new Modification(attribute, ModOp.Replace, new object[] { SecurityDescriptor.BuildAllowList(BuiltinAdministrators, sids, FullControl) });
+                ctx.Directory.Modify(dn, new[] { mod });
             }
-            var sids = V.List(change.Desired!.Get("principals_allowed_to_retrieve_password"))
-                .Select(dn => ctx.Directory.GetByDn(dn, Array.Empty<string>())?.Sid
-                    ?? throw new DirectoryException($"Cannot resolve the SID of '{dn}'."))
-                .ToList();
-            var sd = SecurityDescriptor.BuildAllowList(BuiltinAdministrators, sids, FullControl);
-            ctx.Directory.Modify(change.CurrentDn ?? change.TargetDn!, new[] { new Modification(MembershipAttribute, ModOp.Replace, new object[] { sd }) });
         }
     }
 }

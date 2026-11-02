@@ -359,6 +359,7 @@ namespace Declarad.Tests.Support
                         if (values.Count == 0)
                         {
                             e.Attrs.Remove(m.Attribute);
+                            e.Binary.Remove(m.Attribute);
                             break;
                         }
                         var list = e.Attrs.TryGetValue(m.Attribute, out var l) ? l : new List<string>();

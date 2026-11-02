@@ -11,7 +11,7 @@ namespace Declarad.Directory
         private const int PageSize = 500;
         private static readonly HashSet<string> BinaryAttributes = new(StringComparer.OrdinalIgnoreCase)
         {
-            "objectGUID", "objectSid", "nTSecurityDescriptor", "msDS-GroupMSAMembership", "thumbnailPhoto", "userCertificate", "logonHours",
+            "objectGUID", "objectSid", "nTSecurityDescriptor", "msDS-GroupMSAMembership", "msDS-AllowedToActOnBehalfOfOtherIdentity", "thumbnailPhoto", "userCertificate", "logonHours",
             "dnsRecord", "dNSProperty",
         };
 

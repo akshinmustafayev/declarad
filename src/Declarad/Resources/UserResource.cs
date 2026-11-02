@@ -19,18 +19,7 @@ namespace Declarad.Resources
         public override string Filter => "(&(objectCategory=person)(objectClass=user))";
         protected override IEnumerable<string> ExtraLdapAttributes => new[] { "userAccountControl", "accountExpires", "userWorkstations" };
 
-        /// <summary>Account options stored as userAccountControl flags. Unmanaged unless set.</summary>
-        private static readonly (string Name, long Flag, string Description)[] AccountOptions =
-        {
-            ("smartcard_required", Uac.SmartcardRequired, "Smart card is required for interactive logon."),
-            ("password_not_required", Uac.PasswordNotRequired, "The account may have an empty password."),
-            ("reversible_password_encryption", Uac.EncryptedTextPasswordAllowed, "Store the password using reversible encryption."),
-            ("trusted_for_delegation", Uac.TrustedForDelegation, "Trusted for Kerberos (unconstrained) delegation."),
-            ("trusted_to_auth_for_delegation", Uac.TrustedToAuthForDelegation, "Trusted to authenticate for delegation (protocol transition)."),
-            ("account_is_sensitive", Uac.NotDelegated, "Account is sensitive and cannot be delegated."),
-            ("use_des_key_only", Uac.UseDesKeyOnly, "Use only Kerberos DES encryption types."),
-            ("dont_require_preauth", Uac.DontRequirePreauth, "Do not require Kerberos preauthentication."),
-        };
+        private static readonly (string Name, long Flag, string Description)[] AccountOptions = Uac.Options;
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
@@ -58,6 +47,7 @@ namespace Declarad.Resources
             CommonSpecs.Str("surname", "sn", "Last name."),
             CommonSpecs.Str("initials", "initials", "Initials."),
             CommonSpecs.Str("middle_name", "middleName", "Middle name."),
+            CommonSpecs.Str("personal_title", "personalTitle", "Personal title, e.g. Dr."),
             new AttributeSpec("display_name", AttrType.String)
             {
                 Ldap = "displayName",
@@ -108,6 +98,7 @@ namespace Declarad.Resources
                 Validate = v => V.List(v).Any(w => w.Contains(',') || string.IsNullOrWhiteSpace(w)) ? "computer names must not be empty or contain commas." : null,
             },
             CommonSpecs.List("service_principal_names", "servicePrincipalName", "SPNs (for service accounts that are users). Authoritative when set."),
+            CommonSpecs.List("allowed_to_delegate_to", "msDS-AllowedToDelegateTo", "Kerberos constrained delegation: SPNs of the services this account may delegate to. Authoritative when set."),
             CommonSpecs.List("alt_security_identities", "altSecurityIdentities", "Certificate and Kerberos name mappings (e.g. X509:<I>...<S>...). Authoritative when set."),
             CommonSpecs.Str("mail_nickname", "mailNickname", "Exchange alias (requires the Exchange schema)."),
             new AttributeSpec("hide_from_address_lists", AttrType.Bool)
@@ -130,6 +121,11 @@ namespace Declarad.Resources
             CommonSpecs.DnLink("manager", "manager", "DN or sAMAccountName of the user's manager."),
             CommonSpecs.Bool("enabled", "Whether the account is enabled.", true),
             CommonSpecs.Bool("password_never_expires", "Set 'Password never expires'.", false),
+            new AttributeSpec("user_cannot_change_password", AttrType.Bool)
+            {
+                Description = "'User cannot change password': denies Everyone and SELF the Change Password right, like ADUC. Unmanaged unless set.",
+            },
+            CommonSpecs.Protection(null),
             new AttributeSpec("initial_password", AttrType.String)
             {
                 Description = "Password set when the account is created. Never read back or compared.",
@@ -147,7 +143,7 @@ namespace Declarad.Resources
             CommonSpecs.Str("unix_home_directory", "unixHomeDirectory", "Unix home directory (RFC 2307)."),
             CommonSpecs.Str("login_shell", "loginShell", "Unix login shell (RFC 2307)."),
         }
-        .Concat(AccountOptions.Select(o => new AttributeSpec(o.Name, AttrType.Bool) { Description = o.Description + " Unmanaged unless set." }))
+        .Concat(Uac.OptionSpecs(AccountOptions))
         .Concat(Enumerable.Range(1, 15).Select(i => CommonSpecs.Str($"extension_attribute_{i}", $"extensionAttribute{i}", $"Custom attribute {i} (requires the Exchange schema).")))
         .Append(CommonSpecs.Groups())
         .ToArray();
@@ -196,10 +192,8 @@ namespace Declarad.Resources
             long uac = obj.GetLong("userAccountControl") ?? Uac.NormalAccount;
             result["enabled"] = Value.From((uac & Uac.AccountDisable) == 0);
             result["password_never_expires"] = Value.From((uac & Uac.DontExpirePassword) != 0);
-            foreach (var option in AccountOptions)
-            {
-                result[option.Name] = Value.From((uac & option.Flag) != 0);
-            }
+            Uac.ReadOptions(uac, AccountOptions, result);
+            result["user_cannot_change_password"] = Value.From(SecurityDescriptor.IsChangePasswordDenied(obj.SecurityDescriptor));
             result["logon_workstations"] = Value.FromStrings(SplitWorkstations(obj.Get("userWorkstations")));
             result["account_expires"] = AccountExpiry.FromLdap(obj.Get("accountExpires"));
         }
@@ -207,11 +201,7 @@ namespace Declarad.Resources
         private static long ComputeUac(long current, Func<string, Value> get)
         {
             long uac = Uac.Set(Uac.WithEnabled(current, get("enabled")), Uac.DontExpirePassword, V.Bool(get("password_never_expires")));
-            foreach (var option in AccountOptions)
-            {
-                uac = Uac.Set(uac, option.Flag, V.Bool(get(option.Name)));
-            }
-            return uac;
+            return Uac.WithOptions(uac, AccountOptions, get);
         }
 
         private static IEnumerable<string> SplitWorkstations(string? value) =>
@@ -253,6 +243,10 @@ namespace Declarad.Resources
                 }
                 mods.Add(Modification.Replace("userAccountControl", ComputeUac(Uac.NormalAccount, desired.Get).ToString()));
                 ctx.Directory.Modify(desired.Dn, mods);
+                if (V.Bool(desired.Get("user_cannot_change_password")) == true)
+                {
+                    SetCannotChangePassword(ctx, desired.Dn, true);
+                }
             }
             catch (DirectoryException ex)
             {
@@ -283,6 +277,24 @@ namespace Declarad.Resources
             return ex;
         }
 
+        protected override void AfterUpdate(ApplyContext ctx, ResourceChange change, string dn)
+        {
+            if (change.Get("user_cannot_change_password") != null)
+            {
+                SetCannotChangePassword(ctx, dn, V.Bool(UpdateValues(change)("user_cannot_change_password")) == true);
+            }
+        }
+
+        private static void SetCannotChangePassword(ApplyContext ctx, string dn, bool deny)
+        {
+            var sd = ctx.Directory.GetByDn(dn, Array.Empty<string>(), withSecurityDescriptor: true)?.SecurityDescriptor
+                ?? throw new DirectoryException($"Could not read the security descriptor of '{dn}'. The account needs 'Read permissions' on the user.");
+            if (SecurityDescriptor.IsChangePasswordDenied(sd) != deny)
+            {
+                ctx.Directory.SetSecurityDescriptor(dn, SecurityDescriptor.SetChangePasswordDenied(sd, deny));
+            }
+        }
+
         public static byte[] EncodePassword(string password) => Encoding.Unicode.GetBytes($"\"{password}\"");
 
         protected override IEnumerable<Modification> SpecialModifications(ResourceChange change)
@@ -290,7 +302,7 @@ namespace Declarad.Resources
             if (change.Get("enabled") != null || change.Get("password_never_expires") != null || AccountOptions.Any(o => change.Get(o.Name) != null))
             {
                 long current = change.Actual!.GetLong("userAccountControl") ?? Uac.NormalAccount;
-                yield return Modification.Replace("userAccountControl", ComputeUac(current, change.Desired!.Get).ToString());
+                yield return Modification.Replace("userAccountControl", ComputeUac(current, UpdateValues(change)).ToString());
             }
             if (change.Get("account_expires") is { } expiry)
             {

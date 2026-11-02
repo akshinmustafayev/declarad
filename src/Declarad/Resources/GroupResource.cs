@@ -33,6 +33,15 @@ namespace Declarad.Resources
             CommonSpecs.Str("display_name", "displayName", "Display name."),
             CommonSpecs.Str("email", "mail", "E-mail address."),
             CommonSpecs.Str("notes", "info", "Notes."),
+            CommonSpecs.List("proxy_addresses", "proxyAddresses", "E-mail proxy addresses (e.g. SMTP:team@corp.com). Authoritative when set."),
+            CommonSpecs.Str("mail_nickname", "mailNickname", "Exchange alias (requires the Exchange schema)."),
+            new AttributeSpec("hide_from_address_lists", AttrType.Bool)
+            {
+                Ldap = "msExchHideFromAddressLists",
+                Format = LdapFormat.Bool,
+                Description = "Hide from Exchange address lists (requires the Exchange schema).",
+            },
+            CommonSpecs.Number("gid_number", "gidNumber", "Unix group ID (RFC 2307)."),
             new AttributeSpec("scope", AttrType.String)
             {
                 Description = "global, domain_local or universal.",
@@ -54,8 +63,11 @@ namespace Declarad.Resources
                 AcceptsSamAccountName = true,
                 Deferred = true,
             },
-            CommonSpecs.Groups(),
-        };
+            CommonSpecs.Protection(null),
+        }
+        .Concat(Enumerable.Range(1, 15).Select(i => CommonSpecs.Str($"extension_attribute_{i}", $"extensionAttribute{i}", $"Custom attribute {i} (requires the Exchange schema).")))
+        .Append(CommonSpecs.Groups())
+        .ToArray();
 
         public static long GroupType(string scope, string category)
         {

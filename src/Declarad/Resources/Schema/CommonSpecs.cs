@@ -64,6 +64,13 @@ namespace Declarad.Resources.Schema
             Additive = true,
         };
 
+        /// <summary>ADUC's "Protect object from accidental deletion"; unmanaged unless set when there is no default.</summary>
+        public static AttributeSpec Protection(bool? defaultValue) => new(ResourceType.Protected, AttrType.Bool)
+        {
+            Description = "Deny 'Delete' and 'Delete subtree' to Everyone, like the ADUC checkbox." + (defaultValue == null ? " Unmanaged unless set." : ""),
+            Default = defaultValue == null ? null : Value.From(defaultValue.Value),
+        };
+
         public static AttributeSpec Bool(string name, string description, bool defaultValue) => new(name, AttrType.Bool)
         {
             Description = description,

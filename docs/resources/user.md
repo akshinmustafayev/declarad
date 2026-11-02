@@ -35,6 +35,8 @@ DN: `CN=<name>,<path>`. `sam_account_name` is required (the block label is only 
 - **`enabled`** and **`password_never_expires`** manage bits of `userAccountControl`; other bits are preserved.
 - **Account options** (`smartcard_required`, `account_is_sensitive`, `trusted_for_delegation`, `trusted_to_auth_for_delegation`, `dont_require_preauth`, `use_des_key_only`, `reversible_password_encryption`, `password_not_required`) are the other `userAccountControl` checkboxes on the Account tab. They are managed only when set, so adopting existing users never flips them. Delegation flags need the *Enable computer and user accounts to be trusted for delegation* right.
 - **`logon_workstations`** is the *Log On To...* list. `[]` allows every computer again.
+- **`user_cannot_change_password`** is ADUC's *User cannot change password* checkbox: deny ACEs for Everyone and SELF on the Change Password right. **`protected_from_accidental_deletion`** adds ADUC's deny-delete ACE; a protected user can't be deleted until you set it to `false` and apply. Both are unmanaged unless set; removing one that declarad set turns it off again.
+- **`allowed_to_delegate_to`** is Kerberos constrained delegation (`msDS-AllowedToDelegateTo`). Add `trusted_to_auth_for_delegation = true` for protocol transition.
 - **Country.** ADUC writes three attributes: `country` (`c`, e.g. `DE`), `country_name` (`co`, `Germany`) and `country_code` (`countryCode`, `276`). Set all three for ADUC to show the country correctly.
 - **Lists** (`other_phones`, `other_mobiles`, `other_web_pages`, `service_principal_names`, `alt_security_identities`, ...) are authoritative when set: values not listed are removed.
 - **Exchange attributes** (`mail_nickname`, `hide_from_address_lists`, `extension_attribute_1`...`15`) and the **Unix attributes** (`uid_number`, `gid_number`, `unix_home_directory`, `login_shell`) exist only when the schema has them; leave them unset otherwise.
@@ -56,6 +58,7 @@ DN: `CN=<name>,<path>`. `sam_account_name` is required (the block label is only 
 | `surname` | string |  | LDAP `sn` | Last name. |
 | `initials` | string |  | LDAP `initials` | Initials. |
 | `middle_name` | string |  | LDAP `middleName` | Middle name. |
+| `personal_title` | string |  | LDAP `personalTitle` | Personal title, e.g. Dr. |
 | `display_name` | string | computed | LDAP `displayName` | Display name. Defaults to "given_name surname" when either is set. |
 | `description` | string |  | LDAP `description` | Free-text description. |
 | `email` | string |  | LDAP `mail` | E-mail address. |
@@ -97,6 +100,7 @@ DN: `CN=<name>,<path>`. `sam_account_name` is required (the block label is only 
 | `preferred_language` | string |  | LDAP `preferredLanguage` | Preferred language, e.g. en-US. |
 | `logon_workstations` | list(string) |  |  | Computers the user may log on to ("Log On To..."). Authoritative when set; [] allows all computers. |
 | `service_principal_names` | list(string) |  | authoritative; LDAP `servicePrincipalName` | SPNs (for service accounts that are users). Authoritative when set. |
+| `allowed_to_delegate_to` | list(string) |  | authoritative; LDAP `msDS-AllowedToDelegateTo` | Kerberos constrained delegation: SPNs of the services this account may delegate to. Authoritative when set. |
 | `alt_security_identities` | list(string) |  | authoritative; LDAP `altSecurityIdentities` | Certificate and Kerberos name mappings (e.g. X509:<I>...<S>...). Authoritative when set. |
 | `mail_nickname` | string |  | LDAP `mailNickname` | Exchange alias (requires the Exchange schema). |
 | `hide_from_address_lists` | bool |  | LDAP `msExchHideFromAddressLists` | Hide from Exchange address lists (requires the Exchange schema). |
@@ -105,6 +109,8 @@ DN: `CN=<name>,<path>`. `sam_account_name` is required (the block label is only 
 | `manager` | string |  | DN or sAMAccountName; LDAP `manager` | DN or sAMAccountName of the user's manager. |
 | `enabled` | bool | `true` |  | Whether the account is enabled. |
 | `password_never_expires` | bool | `false` |  | Set 'Password never expires'. |
+| `user_cannot_change_password` | bool |  |  | 'User cannot change password': denies Everyone and SELF the Change Password right, like ADUC. Unmanaged unless set. |
+| `protected_from_accidental_deletion` | bool |  |  | Deny 'Delete' and 'Delete subtree' to Everyone, like the ADUC checkbox. Unmanaged unless set. |
 | `initial_password` | string |  | creation only; sensitive | Password set when the account is created. Never read back or compared. |
 | `change_password_at_logon` | bool | `false` | creation only | Require a password change at first logon (applied at creation only). |
 | `uid_number` | number |  | LDAP `uidNumber` | Unix user ID (RFC 2307). |
