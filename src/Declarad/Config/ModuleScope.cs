@@ -1181,7 +1181,9 @@ namespace Declarad.Config
                 }
                 if (value.IsNull && name == type.LabelAttribute && !inst.Block.IsExpanded)
                 {
-                    value = Value.From(inst.Block.Label);
+                    string label = _l.Options.LabelDefaults?.GetValueOrDefault(inst.Result.Address) ?? inst.Block.Label;
+                    inst.Result.LabelDefault = label == inst.Block.Label ? null : label;
+                    value = Value.From(label);
                 }
                 if (value.IsNull)
                 {

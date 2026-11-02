@@ -135,7 +135,7 @@ namespace Declarad.Engine
             var upserts = new List<ResourceChange>();
             foreach (var r in desired.Where(r => Targeted(r.Address)))
             {
-                var change = r.Type is AttachmentType ? PlanAttachment(r, moved, desired) : PlanResource(r, moved, orphans, claimed, authoritativeGroups);
+                var change = r.Type is AttachmentType ? PlanAttachment(r, moved, orphans, claimed, desired) : PlanResource(r, moved, orphans, claimed, authoritativeGroups);
                 if (change != null)
                 {
                     upserts.Add(change);
@@ -156,6 +156,7 @@ namespace Declarad.Engine
             {
                 throw new ConfigErrorsException(_errors.ToList());
             }
+            WarnAboutReplacedLabels(upserts, deletes, plan);
 
             MarkEarlyDeletes(upserts, deletes);
             plan.Changes.AddRange(deletes.Where(d => d.Early));
@@ -182,7 +183,7 @@ namespace Declarad.Engine
             {
                 string? sam = V.Str(delete.Prior?.Get("sam_account_name") ?? Value.Null);
                 string? upn = V.Str(delete.Prior?.Get("user_principal_name") ?? Value.Null);
-                delete.Early = upserts.Any(u => !u.IsAttachment && u.Action is ChangeAction.Create or ChangeAction.Update && u.Connection == delete.Connection
+                delete.Early = upserts.Any(u => !u.IsAttachment && u.Action is ChangeAction.Create or ChangeAction.Update or ChangeAction.Restore && u.Connection == delete.Connection
                     && (Dn.AreEqual(u.TargetDn, delete.CurrentDn)
                         || (sam != null && string.Equals(V.Str(u.Desired!.Get("sam_account_name")), sam, StringComparison.OrdinalIgnoreCase))
                         || (upn != null && string.Equals(V.Str(u.Desired!.Get("user_principal_name")), upn, StringComparison.OrdinalIgnoreCase))));
@@ -349,25 +350,47 @@ namespace Declarad.Engine
             return prior;
         }
 
+        /// <summary>
+        /// Finds the state entry of a resource whose block label was renamed: an entry of the same type and connection
+        /// whose address is no longer in the configuration and that describes the same object. Like a moved block, the
+        /// object keeps its state (and objectGUID) under the new address instead of being deleted and created again.
+        /// </summary>
+        private static StateResource? ClaimRenamed(ResourceInstance r, List<StateResource> orphans, HashSet<string> claimed, Func<StateResource, bool> sameObject)
+        {
+            var match = orphans.FirstOrDefault(o => o.Type == r.Type.Name && o.Connection == r.Connection && !claimed.Contains(o.Address) && sameObject(o));
+            if (match != null)
+            {
+                claimed.Add(match.Address);
+            }
+            return match;
+        }
+
+        /// <summary>The same object: the same DN, or the same logon name for types that have one.</summary>
+        private static bool SameObject(StateResource prior, ResourceInstance r)
+        {
+            if (Dn.AreEqual(prior.Dn, r.Dn))
+            {
+                return true;
+            }
+            return r.Type.Find("sam_account_name") != null
+                && V.Str(r.Get("sam_account_name")) is { Length: > 0 } sam
+                && string.Equals(V.Str(prior.Get("sam_account_name")), sam, StringComparison.OrdinalIgnoreCase);
+        }
+
         private ResourceChange? PlanResource(ResourceInstance r, Dictionary<string, StateResource> moved, List<StateResource> orphans, HashSet<string> claimed, HashSet<string> authoritativeGroups)
         {
             var type = r.Type;
             var directory = Dir(r.Connection);
             var prior = FindPrior(r, moved, out string? notes);
 
-            if (prior == null)
+            if (prior == null && ClaimRenamed(r, orphans, claimed, o => SameObject(o, r)) is { } renamed)
             {
-                // Same type and DN as a resource that vanished from the configuration: the label was renamed.
-                var renamed = orphans.FirstOrDefault(o => o.Type == type.Name && o.Connection == r.Connection && !claimed.Contains(o.Address) && Dn.AreEqual(o.Dn, r.Dn));
-                if (renamed != null)
-                {
-                    prior = renamed;
-                    claimed.Add(renamed.Address);
-                    notes = $"moved from address {renamed.Address}";
-                }
+                prior = renamed;
+                notes = $"moved from {renamed.Address}";
             }
 
             DirectoryObject? actual = null;
+            DirectoryObject? restoreFrom = null;
             bool adopt = false;
             if (prior != null)
             {
@@ -377,9 +400,14 @@ namespace Declarad.Engine
                     return null;
                 }
                 actual = directory.GetByGuid(prior.Guid, type.LdapAttributes, type.NeedsSecurityDescriptor);
-                if (actual == null)
+                if (actual == null && _options.Restore && directory.GetDeletedByGuid(prior.Guid, type.LdapAttributes) is { } deleted && type.Matches(deleted))
                 {
-                    notes = "the object was deleted outside declarad and will be created again";
+                    restoreFrom = deleted;
+                    notes = "deleted outside declarad; it is in the AD Recycle Bin and will be restored with its SID, attributes and group memberships";
+                }
+                else if (actual == null)
+                {
+                    notes = "the object was deleted outside declarad and will be created again, as a new object with a new SID";
                 }
             }
             if (actual == null && prior == null && _config.Imports.FirstOrDefault(i => i.To == r.Address) is { } import)
@@ -400,17 +428,33 @@ namespace Declarad.Engine
                 adopt = true;
                 notes = $"imported from {import.Id}";
             }
-            if (actual == null)
+            if (restoreFrom != null && directory.GetByDn(r.Dn, Array.Empty<string>()) is { } occupant)
+            {
+                _errors.Add(new DeclaradException(
+                    $"{r.Address}: the deleted object can be restored from the AD Recycle Bin, but '{occupant.Dn}' is now taken by another object. " +
+                    "Rename or remove that object, or run with --no-restore to create a new one.", r.Pos));
+                return null;
+            }
+            if (actual == null && restoreFrom == null)
             {
                 var existing = directory.GetByDn(r.Dn, type.LdapAttributes, type.NeedsSecurityDescriptor);
-                if (existing != null && _state.Resources.FirstOrDefault(s => s.Guid == existing.Guid && s.Connection == r.Connection) is { } owner)
+                var owner = existing == null ? null : _state.Resources.FirstOrDefault(s => s.Guid == existing.Guid && s.Connection == r.Connection);
+                if (existing != null && owner != null && ClaimRenamed(r, orphans, claimed, o => o == owner) != null)
+                {
+                    // The object at this DN belongs to a resource that left the configuration (its recorded DN may be
+                    // out of date, e.g. after a rename outside declarad): the block label was renamed.
+                    prior = owner;
+                    actual = existing;
+                    notes = $"moved from {owner.Address}";
+                }
+                else if (existing != null && owner != null)
                 {
                     _errors.Add(new DeclaradException(
-                        $"{r.Address}: '{existing.Dn}' is already managed as {owner.Address}. Two resources cannot manage one object; " +
-                        "if you renamed or moved resources, rename them in a different order or use a moved block.", r.Pos));
+                        $"{r.Address}: '{existing.Dn}' is already managed as {owner.Address}, which is also in the configuration. " +
+                        "Two resources cannot manage one object; give one of them a different name or path.", r.Pos));
                     return null;
                 }
-                if (existing != null)
+                else if (existing != null)
                 {
                     if (!_options.Adopt)
                     {
@@ -446,7 +490,16 @@ namespace Declarad.Engine
             }
             change.DependsOn.UnionWith(r.DependsOn);
 
-            if (actual == null)
+            if (restoreFrom != null)
+            {
+                // The restore puts the object at the configured DN; other differences are applied right after it.
+                change.Actual = restoreFrom;
+                change.Action = ChangeAction.Restore;
+                Diff(change, type.Read(restoreFrom, directory), authoritativeGroups);
+                change.Changes.RemoveAll(c => c.Name is "name" or "path");
+                DropLinksTheRestoreBringsBack(change, prior!);
+            }
+            else if (actual == null)
             {
                 change.Action = ChangeAction.Create;
                 AddAllAsCreated(change, r);
@@ -468,6 +521,59 @@ namespace Declarad.Engine
             return change;
         }
 
+        /// <summary>
+        /// A renamed block keeps its object (see <see cref="LabelRenames"/>) unless it also changed what makes up the DN;
+        /// then it describes a different object, which plans a delete and a create. Say how to keep the object.
+        /// </summary>
+        private static void WarnAboutReplacedLabels(List<ResourceChange> upserts, List<ResourceChange> deletes, Plan plan)
+        {
+            foreach (var delete in deletes.Where(d => !d.IsAttachment && d.Action == ChangeAction.Delete))
+            {
+                var created = upserts.FirstOrDefault(c => c.Action == ChangeAction.Create && c.Prior == null && !c.IsAttachment
+                    && c.Type.Name == delete.Type.Name && c.Desired!.Connection == delete.Prior!.Connection);
+                if (created != null)
+                {
+                    plan.Warnings.Add($"{delete.Address} will be deleted and {created.Address} created as a new object (with a new SID). " +
+                        "If you renamed the block, its name or path changed as well, so it no longer describes the same object. To keep the " +
+                        $"existing object, rename the block and change its attributes in separate applies, or add a moved block with from = {delete.Address} and to = {created.Address}.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// A deleted object reads without its links (memberships, manager), but the restore brings them back. Values
+        /// the object had when declarad last applied it are therefore not changes.
+        /// </summary>
+        private static void DropLinksTheRestoreBringsBack(ResourceChange change, StateResource prior)
+        {
+            for (int i = change.Changes.Count - 1; i >= 0; i--)
+            {
+                var c = change.Changes[i];
+                if (!c.Spec.Deferred)
+                {
+                    continue;
+                }
+                if (c.Spec.Type == AttrType.StringList)
+                {
+                    Func<string, string> key = c.Spec.IsDn ? Dn.Normalize : x => x;
+                    var had = V.List(prior.Get(c.Name)).Select(key).ToHashSet(StringComparer.Ordinal);
+                    var added = c.Added.Where(a => !had.Contains(key(a))).ToList();
+                    if (added.Count == 0 && c.Removed.Count == 0)
+                    {
+                        change.Changes.RemoveAt(i);
+                    }
+                    else
+                    {
+                        change.Changes[i] = c with { Added = added };
+                    }
+                }
+                else if (c.New.Equals(prior.Get(c.Name)))
+                {
+                    change.Changes.RemoveAt(i);
+                }
+            }
+        }
+
         private static void AddAllAsCreated(ResourceChange change, ResourceInstance r)
         {
             foreach (var spec in r.Type.Schema)
@@ -481,11 +587,21 @@ namespace Declarad.Engine
             }
         }
 
-        private ResourceChange? PlanAttachment(ResourceInstance r, Dictionary<string, StateResource> moved, List<ResourceInstance> desired)
+        private ResourceChange? PlanAttachment(ResourceInstance r, Dictionary<string, StateResource> moved, List<StateResource> orphans, HashSet<string> claimed, List<ResourceInstance> desired)
         {
             var type = (AttachmentType)r.Type;
             var directory = Dir(r.Connection);
             var prior = FindPrior(r, moved, out string? note);
+            if (prior == null && ClaimRenamed(r, orphans, claimed, o => (Dn.AreEqual(o.Dn, r.Dn) || string.Equals(V.Str(o.Get(type.TargetAttribute)), V.Str(r.Get(type.TargetAttribute)), StringComparison.OrdinalIgnoreCase))
+                    && type.IdentityAttributes
+                    .Where(a => a != type.TargetAttribute)
+                    .All(a => string.Equals(V.Str(o.Get(a)), V.Str(r.Get(a)), StringComparison.OrdinalIgnoreCase))) is { } renamed)
+            {
+                // Same target and identity as an attachment that left the configuration: the block label was renamed.
+                // Without this the new attachment would attach and the old one would detach the same items.
+                prior = renamed;
+                note = $"moved from {renamed.Address}";
+            }
             var previousTarget = prior != null ? directory.GetByGuid(prior.Guid, type.TargetLdapAttributes) : null;
             var target = directory.GetByDn(r.Dn, type.TargetLdapAttributes);
             bool createdInThisPlan = type.CreatesTarget || desired.Any(d => d.Type is not AttachmentType && d.Connection == r.Connection && Dn.AreEqual(d.Dn, r.Dn));

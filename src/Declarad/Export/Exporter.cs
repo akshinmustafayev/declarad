@@ -138,6 +138,11 @@ namespace Declarad.Export
                     continue;
                 }
 
+                // A flag without a default (e.g. smartcard_required) is unmanaged unless set; only export it when on.
+                if (spec.Type == AttrType.Bool && defaultValue.IsNull && V.Bool(value) == false)
+                {
+                    continue;
+                }
                 bool isDefault = spec.IsDn ? Dn.AreEqual(V.Str(value), V.Str(defaultValue)) : value.Equals(defaultValue);
                 if ((V.IsEmpty(value) && V.IsEmpty(defaultValue)) || isDefault)
                 {

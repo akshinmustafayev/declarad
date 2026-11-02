@@ -21,6 +21,12 @@ namespace Declarad.State
 
         public bool PreventDestroy { get; set; }
 
+        /// <summary>
+        /// The label the label-derived default (e.g. a user's sam_account_name) is computed from, when it differs from
+        /// the label in <see cref="Address"/>: the block was renamed, and the object keeps the values of its old label.
+        /// </summary>
+        public string? LabelDefault { get; set; }
+
         public Value Get(string name) => Attributes.TryGetValue(name, out var v) ? v : Value.Null;
     }
 }

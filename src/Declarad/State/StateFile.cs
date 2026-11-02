@@ -49,6 +49,10 @@ namespace Declarad.State
                 {
                     obj["prevent_destroy"] = true;
                 }
+                if (r.LabelDefault != null)
+                {
+                    obj["label_default"] = r.LabelDefault;
+                }
                 if (r.Connection != DefaultConnection)
                 {
                     obj["connection"] = r.Connection;
@@ -102,6 +106,7 @@ namespace Declarad.State
                     Dn = node["dn"]?.GetValue<string>() ?? "",
                     Attributes = attrs,
                     PreventDestroy = node["prevent_destroy"]?.GetValue<bool>() ?? false,
+                    LabelDefault = node["label_default"]?.GetValue<string>(),
                     Connection = node["connection"]?.GetValue<string>() ?? DefaultConnection,
                 });
             }

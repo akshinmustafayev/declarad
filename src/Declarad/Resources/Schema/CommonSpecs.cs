@@ -40,6 +40,13 @@ namespace Declarad.Resources.Schema
             Description = description,
         };
 
+        /// <summary>A multi-valued string attribute, authoritative when set.</summary>
+        public static AttributeSpec List(string name, string ldap, string description) => new(name, AttrType.StringList)
+        {
+            Ldap = ldap,
+            Description = description,
+        };
+
         public static AttributeSpec Country() => new("country", AttrType.String)
         {
             Ldap = "c",

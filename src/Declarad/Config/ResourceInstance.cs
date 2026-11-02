@@ -33,6 +33,9 @@ namespace Declarad.Config
         public bool HasUnknowns { get; set; }
 
         public bool PreventDestroy { get; set; }
+
+        /// <summary>The old label used for the label-derived default after a block rename (see <see cref="LabelRenames"/>).</summary>
+        public string? LabelDefault { get; set; }
         public HashSet<string> IgnoreChanges { get; } = new(StringComparer.Ordinal);
 
         /// <summary>Addresses this instance must be applied after (from references and depends_on).</summary>

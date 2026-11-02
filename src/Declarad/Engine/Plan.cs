@@ -11,6 +11,7 @@ namespace Declarad.Engine
 
         public int ToAdd => Changes.Count(c => c.Action is ChangeAction.Create or ChangeAction.Replace);
         public int ToChange => Count(ChangeAction.Update);
+        public int ToRestore => Count(ChangeAction.Restore);
         public int ToDestroy => Changes.Count(c => c.Action is ChangeAction.Delete or ChangeAction.Replace);
     }
 }

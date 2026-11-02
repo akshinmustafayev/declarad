@@ -17,7 +17,20 @@ namespace Declarad.Resources
         public override string Description => "User account";
         public override string? LabelAttribute => "sam_account_name";
         public override string Filter => "(&(objectCategory=person)(objectClass=user))";
-        protected override IEnumerable<string> ExtraLdapAttributes => new[] { "userAccountControl", "accountExpires" };
+        protected override IEnumerable<string> ExtraLdapAttributes => new[] { "userAccountControl", "accountExpires", "userWorkstations" };
+
+        /// <summary>Account options stored as userAccountControl flags. Unmanaged unless set.</summary>
+        private static readonly (string Name, long Flag, string Description)[] AccountOptions =
+        {
+            ("smartcard_required", Uac.SmartcardRequired, "Smart card is required for interactive logon."),
+            ("password_not_required", Uac.PasswordNotRequired, "The account may have an empty password."),
+            ("reversible_password_encryption", Uac.EncryptedTextPasswordAllowed, "Store the password using reversible encryption."),
+            ("trusted_for_delegation", Uac.TrustedForDelegation, "Trusted for Kerberos (unconstrained) delegation."),
+            ("trusted_to_auth_for_delegation", Uac.TrustedToAuthForDelegation, "Trusted to authenticate for delegation (protocol transition)."),
+            ("account_is_sensitive", Uac.NotDelegated, "Account is sensitive and cannot be delegated."),
+            ("use_des_key_only", Uac.UseDesKeyOnly, "Use only Kerberos DES encryption types."),
+            ("dont_require_preauth", Uac.DontRequirePreauth, "Do not require Kerberos preauthentication."),
+        };
 
         public override IReadOnlyList<AttributeSpec> Schema { get; } = new[]
         {
@@ -44,6 +57,7 @@ namespace Declarad.Resources
             CommonSpecs.Str("given_name", "givenName", "First name."),
             CommonSpecs.Str("surname", "sn", "Last name."),
             CommonSpecs.Str("initials", "initials", "Initials."),
+            CommonSpecs.Str("middle_name", "middleName", "Middle name."),
             new AttributeSpec("display_name", AttrType.String)
             {
                 Ldap = "displayName",
@@ -55,22 +69,53 @@ namespace Declarad.Resources
             CommonSpecs.Str("title", "title", "Job title."),
             CommonSpecs.Str("department", "department", "Department."),
             CommonSpecs.Str("company", "company", "Company."),
+            CommonSpecs.Str("division", "division", "Division."),
             CommonSpecs.Str("office", "physicalDeliveryOfficeName", "Office."),
             CommonSpecs.Str("phone", "telephoneNumber", "Telephone number."),
+            CommonSpecs.List("other_phones", "otherTelephone", "Other telephone numbers."),
             CommonSpecs.Str("mobile", "mobile", "Mobile number."),
+            CommonSpecs.List("other_mobiles", "otherMobile", "Other mobile numbers."),
+            CommonSpecs.Str("home_phone", "homePhone", "Home telephone number."),
+            CommonSpecs.List("other_home_phones", "otherHomePhone", "Other home telephone numbers."),
+            CommonSpecs.Str("pager", "pager", "Pager number."),
+            CommonSpecs.List("other_pagers", "otherPager", "Other pager numbers."),
+            CommonSpecs.Str("fax", "facsimileTelephoneNumber", "Fax number."),
+            CommonSpecs.List("other_faxes", "otherFacsimileTelephoneNumber", "Other fax numbers."),
+            CommonSpecs.Str("ip_phone", "ipPhone", "IP phone number."),
+            CommonSpecs.List("other_ip_phones", "otherIpPhone", "Other IP phone numbers."),
+            CommonSpecs.Str("notes", "info", "Notes (the Telephones tab's Notes field)."),
             CommonSpecs.Str("employee_id", "employeeID", "Employee ID."),
             CommonSpecs.Str("employee_number", "employeeNumber", "Employee number."),
             CommonSpecs.Str("employee_type", "employeeType", "Employee type."),
             CommonSpecs.Str("street_address", "streetAddress", "Street address."),
+            CommonSpecs.Str("po_box", "postOfficeBox", "P.O. box."),
             CommonSpecs.Str("city", "l", "City."),
             CommonSpecs.Str("state", "st", "State or province."),
             CommonSpecs.Str("postal_code", "postalCode", "Postal code."),
             CommonSpecs.Country(),
+            CommonSpecs.Str("country_name", "co", "Country name as shown in ADUC (e.g. Germany). Set it together with country and country_code."),
+            CommonSpecs.Number("country_code", "countryCode", "ISO 3166 numeric country code (e.g. 276 for Germany)."),
             CommonSpecs.Str("home_directory", "homeDirectory", "Home folder UNC path."),
             CommonSpecs.Str("home_drive", "homeDrive", "Home drive letter, e.g. H:."),
             CommonSpecs.Str("script_path", "scriptPath", "Logon script."),
             CommonSpecs.Str("profile_path", "profilePath", "Roaming profile path."),
             CommonSpecs.Str("web_page", "wWWHomePage", "Web page."),
+            CommonSpecs.List("other_web_pages", "url", "Other web pages."),
+            CommonSpecs.Str("preferred_language", "preferredLanguage", "Preferred language, e.g. en-US."),
+            new AttributeSpec("logon_workstations", AttrType.StringList)
+            {
+                Description = "Computers the user may log on to (\"Log On To...\"). Authoritative when set; [] allows all computers.",
+                Validate = v => V.List(v).Any(w => w.Contains(',') || string.IsNullOrWhiteSpace(w)) ? "computer names must not be empty or contain commas." : null,
+            },
+            CommonSpecs.List("service_principal_names", "servicePrincipalName", "SPNs (for service accounts that are users). Authoritative when set."),
+            CommonSpecs.List("alt_security_identities", "altSecurityIdentities", "Certificate and Kerberos name mappings (e.g. X509:<I>...<S>...). Authoritative when set."),
+            CommonSpecs.Str("mail_nickname", "mailNickname", "Exchange alias (requires the Exchange schema)."),
+            new AttributeSpec("hide_from_address_lists", AttrType.Bool)
+            {
+                Ldap = "msExchHideFromAddressLists",
+                Format = LdapFormat.Bool,
+                Description = "Hide from Exchange address lists (requires the Exchange schema).",
+            },
             new AttributeSpec("proxy_addresses", AttrType.StringList)
             {
                 Ldap = "proxyAddresses",
@@ -97,8 +142,15 @@ namespace Declarad.Resources
                 CreateOnly = true,
                 Default = Value.False,
             },
-            CommonSpecs.Groups(),
-        };
+            CommonSpecs.Number("uid_number", "uidNumber", "Unix user ID (RFC 2307)."),
+            CommonSpecs.Number("gid_number", "gidNumber", "Unix primary group ID (RFC 2307)."),
+            CommonSpecs.Str("unix_home_directory", "unixHomeDirectory", "Unix home directory (RFC 2307)."),
+            CommonSpecs.Str("login_shell", "loginShell", "Unix login shell (RFC 2307)."),
+        }
+        .Concat(AccountOptions.Select(o => new AttributeSpec(o.Name, AttrType.Bool) { Description = o.Description + " Unmanaged unless set." }))
+        .Concat(Enumerable.Range(1, 15).Select(i => CommonSpecs.Str($"extension_attribute_{i}", $"extensionAttribute{i}", $"Custom attribute {i} (requires the Exchange schema).")))
+        .Append(CommonSpecs.Groups())
+        .ToArray();
 
         internal static Value FullName(Func<string, Value> get)
         {
@@ -144,11 +196,26 @@ namespace Declarad.Resources
             long uac = obj.GetLong("userAccountControl") ?? Uac.NormalAccount;
             result["enabled"] = Value.From((uac & Uac.AccountDisable) == 0);
             result["password_never_expires"] = Value.From((uac & Uac.DontExpirePassword) != 0);
+            foreach (var option in AccountOptions)
+            {
+                result[option.Name] = Value.From((uac & option.Flag) != 0);
+            }
+            result["logon_workstations"] = Value.FromStrings(SplitWorkstations(obj.Get("userWorkstations")));
             result["account_expires"] = AccountExpiry.FromLdap(obj.Get("accountExpires"));
         }
 
-        private static long ComputeUac(long current, Func<string, Value> get) =>
-            Uac.Set(Uac.WithEnabled(current, get("enabled")), Uac.DontExpirePassword, V.Bool(get("password_never_expires")));
+        private static long ComputeUac(long current, Func<string, Value> get)
+        {
+            long uac = Uac.Set(Uac.WithEnabled(current, get("enabled")), Uac.DontExpirePassword, V.Bool(get("password_never_expires")));
+            foreach (var option in AccountOptions)
+            {
+                uac = Uac.Set(uac, option.Flag, V.Bool(get(option.Name)));
+            }
+            return uac;
+        }
+
+        private static IEnumerable<string> SplitWorkstations(string? value) =>
+            (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         protected override void AddCreateAttributes(Config.ResourceInstance desired, Dictionary<string, object[]> attributes)
         {
@@ -162,6 +229,10 @@ namespace Declarad.Resources
             if (!V.IsEmpty(desired.Get("account_expires")))
             {
                 attributes["accountExpires"] = new object[] { AccountExpiry.ToLdap(V.Str(desired.Get("account_expires"))!) };
+            }
+            if (V.List(desired.Get("logon_workstations")) is { Count: > 0 } workstations)
+            {
+                attributes["userWorkstations"] = new object[] { string.Join(",", workstations) };
             }
         }
 
@@ -216,7 +287,7 @@ namespace Declarad.Resources
 
         protected override IEnumerable<Modification> SpecialModifications(ResourceChange change)
         {
-            if (change.Get("enabled") != null || change.Get("password_never_expires") != null)
+            if (change.Get("enabled") != null || change.Get("password_never_expires") != null || AccountOptions.Any(o => change.Get(o.Name) != null))
             {
                 long current = change.Actual!.GetLong("userAccountControl") ?? Uac.NormalAccount;
                 yield return Modification.Replace("userAccountControl", ComputeUac(current, change.Desired!.Get).ToString());
@@ -224,6 +295,11 @@ namespace Declarad.Resources
             if (change.Get("account_expires") is { } expiry)
             {
                 yield return Modification.Replace("accountExpires", AccountExpiry.ToLdap(V.Str(expiry.New) ?? AccountExpiry.Never));
+            }
+            if (change.Get("logon_workstations") is { } workstations)
+            {
+                var names = V.List(workstations.New);
+                yield return names.Count == 0 ? Modification.Clear("userWorkstations") : Modification.Replace("userWorkstations", string.Join(",", names));
             }
         }
     }

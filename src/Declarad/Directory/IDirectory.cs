@@ -30,5 +30,14 @@ namespace Declarad.Directory
         void Rename(string dn, string newRdn, string newParentDn);
 
         void Delete(string dn);
+
+        /// <summary>
+        /// Finds a deleted object in the AD Recycle Bin by objectGUID. Returns null when it is not there, when it was
+        /// already recycled (its attributes are gone), or when the Recycle Bin is not enabled.
+        /// </summary>
+        DirectoryObject? GetDeletedByGuid(Guid guid, IReadOnlyCollection<string> attributes);
+
+        /// <summary>Restores an object from the AD Recycle Bin to <paramref name="newDn"/>, with its SID, attributes and memberships.</summary>
+        void Restore(string deletedDn, string newDn);
     }
 }

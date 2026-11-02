@@ -8,6 +8,12 @@ namespace Declarad.Engine
         /// <summary>Plan the deletion of everything in state.</summary>
         public bool Destroy { get; init; }
 
+        /// <summary>
+        /// Restore managed objects that were deleted outside declarad from the AD Recycle Bin (keeping their SID and
+        /// memberships) instead of creating new ones.
+        /// </summary>
+        public bool Restore { get; init; } = true;
+
         /// <summary>Whether the connection is encrypted (passwords can only be set over LDAPS/StartTLS).</summary>
         public bool Encrypted { get; init; } = true;
 

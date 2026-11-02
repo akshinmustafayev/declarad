@@ -211,15 +211,17 @@ namespace Declarad.Cli
             [Option(Description = "Take existing objects matching a new resource's DN under management")] bool adopt = false,
             [Option(Description = "Plan destroying every managed object")] bool destroy = false,
             [Option(Description = "Limit to these resources or modules and what they depend on (repeatable)")] string[]? target = null,
-            [Option("detailed-exitcode", Description = "Exit 0 = no changes, 1 = error, 2 = changes present")] bool detailedExitCode = false)
+            [Option("detailed-exitcode", Description = "Exit 0 = no changes, 1 = error, 2 = changes present")] bool detailedExitCode = false,
+            [Option("no-restore", Description = "Create objects deleted outside declarad again instead of restoring them from the AD Recycle Bin")] bool noRestore = false)
         {
             return Run(g, () =>
             {
                 var config = LoadConfig(g, online: true);
                 var manager = OpenState(g, config.Settings);
                 var state = manager.Load();
+                config = LabelRenames.Resolve(config, state, labels => LoadConfig(g, online: true, labels));
                 using var pool = NewPool(config);
-                var plan = BuildPlan(config, state, pool, adopt, destroy, target);
+                var plan = BuildPlan(config, state, pool, adopt, destroy, target, restore: !noRestore);
                 var renderer = new PlanRenderer(_ui);
                 Console.Out.Write(renderer.Render(plan));
                 Console.Out.Write(renderer.RenderOutputs(config.Outputs, "Outputs"));
@@ -232,9 +234,10 @@ namespace Declarad.Cli
             GlobalOptions g,
             [Option("auto-approve", Description = "Skip interactive approval")] bool autoApprove = false,
             [Option(Description = "Take existing objects matching a new resource's DN under management")] bool adopt = false,
-            [Option(Description = "Limit to these resources or modules and what they depend on (repeatable)")] string[]? target = null)
+            [Option(Description = "Limit to these resources or modules and what they depend on (repeatable)")] string[]? target = null,
+            [Option("no-restore", Description = "Create objects deleted outside declarad again instead of restoring them from the AD Recycle Bin")] bool noRestore = false)
         {
-            return Run(g, () => ApplyInternal(g, autoApprove, adopt, destroy: false, target));
+            return Run(g, () => ApplyInternal(g, autoApprove, adopt, destroy: false, target, restore: !noRestore));
         }
 
         [Command("destroy", Description = "Delete every object managed by this configuration")]
@@ -243,7 +246,7 @@ namespace Declarad.Cli
             [Option("auto-approve", Description = "Skip interactive approval")] bool autoApprove = false,
             [Option(Description = "Limit to these resources or modules and what depends on them (repeatable)")] string[]? target = null)
         {
-            return Run(g, () => ApplyInternal(g, autoApprove, adopt: false, destroy: true, target));
+            return Run(g, () => ApplyInternal(g, autoApprove, adopt: false, destroy: true, target, restore: false));
         }
 
         [Command("import", Description = "Take an existing directory object under management")]
@@ -513,14 +516,15 @@ namespace Declarad.Cli
 
         // ---- Helpers ---------------------------------------------------------------------------------
 
-        private int ApplyInternal(GlobalOptions g, bool autoApprove, bool adopt, bool destroy, string[]? targets)
+        private int ApplyInternal(GlobalOptions g, bool autoApprove, bool adopt, bool destroy, string[]? targets, bool restore)
         {
             var config = LoadConfig(g, online: true);
             var manager = OpenState(g, config.Settings);
             using var stateLock = LockState(g, manager, destroy ? "destroy" : "apply");
             var state = manager.Load();
+            config = LabelRenames.Resolve(config, state, labels => LoadConfig(g, online: true, labels));
             using var pool = NewPool(config);
-            var plan = BuildPlan(config, state, pool, adopt, destroy, targets);
+            var plan = BuildPlan(config, state, pool, adopt, destroy, targets, restore);
             var renderer = new PlanRenderer(_ui);
             Console.Out.Write(renderer.Render(plan));
             if (!plan.HasChanges)
@@ -555,11 +559,11 @@ namespace Declarad.Cli
                 {
                     _ui.Error(error);
                 }
-                _ui.WriteLine($"Partially applied: {result.Created} added, {result.Updated} changed, {result.Deleted} destroyed. State has been saved; fix the error and run apply again.");
+                _ui.WriteLine($"Partially applied: {Counts(result)}. State has been saved; fix the error and run apply again.");
                 return ExitError;
             }
             SaveOutputs(manager, state, config, destroy, targets);
-            _ui.WriteLine(_ui.Green(_ui.Bold($"Apply complete! Resources: {result.Created} added, {result.Updated} changed, {result.Deleted} destroyed.")));
+            _ui.WriteLine(_ui.Green(_ui.Bold($"Apply complete! Resources: {Counts(result)}.")));
             Console.Out.Write(renderer.RenderOutputs(destroy ? new List<OutputValue>() : config.Outputs, "Outputs"));
             return ExitOk;
         }
@@ -585,7 +589,10 @@ namespace Declarad.Cli
             manager.Save(state);
         }
 
-        private Plan BuildPlan(Configuration config, StateFile state, DirectoryPool pool, bool adopt, bool destroy, string[]? targets)
+        private static string Counts(ApplyResult result) =>
+            $"{result.Created} added, {result.Updated} changed, {result.Deleted} destroyed" + (result.Restored > 0 ? $", {result.Restored} restored" : "");
+
+        private Plan BuildPlan(Configuration config, StateFile state, DirectoryPool pool, bool adopt, bool destroy, string[]? targets, bool restore)
         {
             // Open every connection the plan touches before checking encryption.
             foreach (string connection in config.Resources.Select(r => r.Connection).Concat(state.Resources.Select(s => s.Connection)).Distinct())
@@ -596,6 +603,7 @@ namespace Declarad.Cli
             {
                 Adopt = adopt,
                 Destroy = destroy,
+                Restore = restore,
                 Encrypted = pool.Encrypted,
                 Targets = targets ?? Array.Empty<string>(),
             };
@@ -611,7 +619,7 @@ namespace Declarad.Cli
             return plan;
         }
 
-        private Configuration LoadConfig(GlobalOptions g, bool online)
+        private Configuration LoadConfig(GlobalOptions g, bool online, IReadOnlyDictionary<string, string>? labelDefaults = null)
         {
             var vars = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (string v in g.Vars)
@@ -628,6 +636,7 @@ namespace Declarad.Cli
                 Vars = vars,
                 Connect = online ? ConnectDirectory : null,
                 Prompt = Prompt,
+                LabelDefaults = labelDefaults,
             });
         }
 

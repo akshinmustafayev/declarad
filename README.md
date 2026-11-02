@@ -30,6 +30,9 @@
 - :repeat: **Repeatable**: the same files produce the same directory, in the lab and in production.
 - :penguin: **Runs anywhere**: Windows, Linux and macOS. It talks LDAP/LDAPS straight to your domain controllers, so you don't need RSAT, PowerShell or WinRM.
 
+> [!IMPORTANT]
+> **Before you point declarad at a production domain, please read [How declarad protects your objects](#shield-how-declarad-protects-your-objects)** (and the full [Object identity](docs/object-identity.md) guide). Deleting and re-creating an AD object gives it a new SID, which breaks permissions, memberships, mailboxes and synced identities. declarad is built to avoid that, and it helps to know exactly when it creates, changes or deletes objects.
+
 ```hcl
 connection {
   server   = "dc01.corp.local"
@@ -77,8 +80,30 @@ Plan: 0 to add, 1 to change, 0 to destroy.
 | :cloud: **Shared state with locking** | Local file, Amazon S3 (and S3-compatible storage), Azure Blob Storage, and HTTP (e.g. GitLab-managed state) |
 | :globe_with_meridians: **Several domains** | One configuration can manage several domains or forests through named connections |
 | :inbox_tray: **Adopt what you have** | `export` turns existing objects into configuration; `import` and `--adopt` bring them under management |
-| :shield: **Safe by default** | Existing objects are never silently taken over, OUs are deletion-protected, `prevent_destroy`, and fields you don't manage are left alone |
+| :shield: **Safe by default** | Objects are tracked by objectGUID, so renames never re-create them; deleted objects are restored from the AD Recycle Bin; existing objects are never silently taken over; OUs are deletion-protected. [How it works](#shield-how-declarad-protects-your-objects) |
 | :robot: **CI-friendly** | `plan --detailed-exitcode` for drift detection, `fmt --check`, `validate`, and non-interactive `apply --auto-approve` |
+
+
+## :shield: How declarad protects your objects
+
+In Active Directory an object is not its name: it is its **objectGUID** and **SID**. Permissions, group memberships, mailboxes, profiles and Entra ID sync all point at those. An account deleted and created again with the same name is, to Windows, a *different* account. So declarad treats "delete and re-create" as the most expensive thing it can do:
+
+- **Objects are tracked by objectGUID.** Changing `name` or `path` renames or moves the same object; it is never re-created.
+- **Renaming a block changes nothing in AD.** `user "alice"` → `user "bob"` only moves the entry in declarad's state, and the account keeps its logon name.
+- **There is no "replace" for AD objects.** If AD doesn't allow a change, the plan fails and explains why, instead of deleting and re-creating.
+- **declarad only deletes what it manages**, and only when you remove the block or run `destroy`. `prevent_destroy` and the OU deletion protection stop even that.
+- **Existing objects are never taken over silently.** Use `import`, an `import` block or `--adopt`.
+- **Deleted outside declarad?** The next plan restores the object from the **AD Recycle Bin** with its SID and memberships, instead of creating a new one.
+
+| You do this | declarad does this in AD |
+|---|---|
+| Change attributes | Updates the same object |
+| Change `name` / `path` | Renames / moves the same object |
+| Rename the block, use `moved`, rename a module | Nothing (state only) |
+| Remove the block | Deletes the object (unless protected) |
+| Someone deletes the object in ADUC | Restores it from the Recycle Bin |
+
+Always read the plan before typing `yes`, especially lines with `-` (destroy). The [Object identity](docs/object-identity.md) guide covers every case, the safeguards and an FAQ.
 
 
 ## :rocket: Quick start

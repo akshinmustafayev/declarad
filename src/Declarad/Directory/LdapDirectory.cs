@@ -20,6 +20,8 @@ namespace Declarad.Directory
         private LdapConnection? _connection;
         private string? _baseDn;
         private string? _domainName;
+        private string? _configurationNamingContext;
+        private bool? _recycleBinEnabled;
 
         public LdapDirectory(ConnectionSettings settings, ILogger logger)
         {
@@ -133,8 +135,9 @@ namespace Declarad.Directory
 
         private void ReadRootDse()
         {
-            var response = Send<SearchResponse>(new SearchRequest("", "(objectClass=*)", SearchScope.Base, "defaultNamingContext", "dnsHostName"));
+            var response = Send<SearchResponse>(new SearchRequest("", "(objectClass=*)", SearchScope.Base, "defaultNamingContext", "configurationNamingContext", "dnsHostName"));
             string? namingContext = response.Entries.Count > 0 ? First(response.Entries[0], "defaultNamingContext") : null;
+            _configurationNamingContext = response.Entries.Count > 0 ? First(response.Entries[0], "configurationNamingContext") : null;
 
             _baseDn = _settings.BaseDn ?? namingContext ?? (_settings.Domain != null ? Dn.FromDomain(_settings.Domain) : null)
                 ?? throw new DirectoryException("Could not determine the domain naming context; set base_dn in the connection block.");
@@ -248,6 +251,60 @@ namespace Declarad.Directory
         public void Delete(string dn)
         {
             Send<DeleteResponse>(new DeleteRequest(dn));
+        }
+
+        public DirectoryObject? GetDeletedByGuid(Guid guid, IReadOnlyCollection<string> attributes)
+        {
+            if (!RecycleBinEnabled)
+            {
+                return null;
+            }
+            var request = new SearchRequest($"<GUID={guid}>", "(isDeleted=TRUE)", SearchScope.Base,
+                WithIdentity(attributes.Concat(new[] { "isDeleted", "isRecycled", "lastKnownParent" }).ToList(), false));
+            request.Controls.Add(new ShowDeletedControl());
+            try
+            {
+                var response = Send<SearchResponse>(request);
+                if (response.Entries.Count == 0)
+                {
+                    return null;
+                }
+                var obj = ToObject(response.Entries[0]);
+                // A recycled object has lost its attributes and memberships; it can't be restored meaningfully.
+                return string.Equals(obj.Get("isRecycled"), "TRUE", StringComparison.OrdinalIgnoreCase) ? null : obj;
+            }
+            catch (DirectoryException ex) when (ex.ResultCode == LdapResult.NoSuchObject)
+            {
+                return null;
+            }
+        }
+
+        public void Restore(string deletedDn, string newDn)
+        {
+            // Restoring is a modify of the deleted object, with the Show Deleted control: remove isDeleted and give it a DN.
+            var request = new ModifyRequest(deletedDn, new[]
+            {
+                new DirectoryAttributeModification { Name = "isDeleted", Operation = DirectoryAttributeOperation.Delete },
+                new DirectoryAttributeModification { Name = "distinguishedName", Operation = DirectoryAttributeOperation.Replace },
+            });
+            request.Modifications[1].Add(newDn);
+            request.Controls.Add(new ShowDeletedControl());
+            Send<ModifyResponse>(request);
+        }
+
+        /// <summary>Whether the forest has the Recycle Bin optional feature enabled (it is listed on the Partitions container).</summary>
+        private bool RecycleBinEnabled => _recycleBinEnabled ??= ReadRecycleBinEnabled();
+
+        private bool ReadRecycleBinEnabled()
+        {
+            if (_configurationNamingContext == null)
+            {
+                return false;
+            }
+            var partitions = GetByDn($"CN=Partitions,{_configurationNamingContext}", new[] { "msDS-EnabledFeature" });
+            bool enabled = partitions?.GetAll("msDS-EnabledFeature").Any(f => f.StartsWith("CN=Recycle Bin Feature,", StringComparison.OrdinalIgnoreCase)) == true;
+            _logger.LogDebug("AD Recycle Bin {State}", enabled ? "enabled" : "not enabled");
+            return enabled;
         }
 
         private static string[] WithIdentity(IReadOnlyCollection<string> attributes, bool withSecurityDescriptor)

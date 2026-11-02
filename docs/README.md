@@ -6,6 +6,7 @@ declarad manages Active Directory the way Terraform manages cloud infrastructure
 
 - [Getting started](getting-started.md): install, first configuration, first apply.
 - [Core concepts](concepts.md): state, planning, apply phases, who owns which attribute, safety rules.
+- [Object identity](object-identity.md): **read before using it in production.** When declarad creates, changes and deletes objects, why it protects SIDs and GUIDs, renames, deletion safeguards and the AD Recycle Bin.
 - [Command reference](cli.md): every command, option and exit code.
 
 ## Configuration language
